@@ -33,8 +33,8 @@ async function run<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => I
 export interface LocalEntry {
   blob: Blob;
   savedAt: number;
-  /** YouCam file id for this photo, if it was analyzed (valid for a limited time). */
-  fileId?: string;
+  /** For previews: which renderer made the image. */
+  engine?: "youcam" | "device";
 }
 
 export async function putLocal(key: string, entry: LocalEntry): Promise<void> {

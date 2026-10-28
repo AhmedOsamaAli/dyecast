@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { naturalLab } from "../levels";
+import { hexToLab } from "@/lib/color";
 import { boxesNeeded, densityFromYouCam, lengthFromYouCam } from "../boxes";
 import { findPaths } from "../get-there";
 import { CAMERA_L_OFFSET, robustHairLab, suggestFromHairClass, suggestFromLab } from "../measure";
@@ -101,5 +102,17 @@ describe("measurement suggestions", () => {
     expect(s.suggestGray).toBeUndefined();
     expect(s.level).toBe(8);
     expect(s.tone).toBe("cool");
+  });
+
+  it("ignores a red class from YouCam when the measured hair shows no warmth", () => {
+    // Live test: very dark brown hair measured rgb(52, 43, 46) on device, while YouCam's class said "Auburn".
+    const s = suggestFromLab(hexToLab("#342B2E"), "Auburn");
+    expect(s.tone).toBe("neutral");
+    expect(s.level).toBe(3);
+  });
+
+  it("keeps red when the class and the measurement agree", () => {
+    const red = describedHairLab(6, "red");
+    expect(suggestFromLab({ ...red, L: red.L - CAMERA_L_OFFSET }, "Red").tone).toBe("red");
   });
 });

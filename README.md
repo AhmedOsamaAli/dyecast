@@ -53,7 +53,7 @@ with the same engine.
 | AI Hair Length Detection | `hair-length-detection` | Suggested length → box count | 2 |
 | AI Hair Density Detection | `hair-density-detection` | Optional hairline photo → density → box count | 1 |
 | AI Hair Color (try-on) | `hair-color` | Render the box promise and the predicted result (`full`, or `ombre` for roots vs. lengths) | 1 per render |
-| Task API | `POST /s2s/v2.0/task/delete` | Delete each task and its images as soon as results are delivered | — |
+| Task API | `POST /s2s/v2.0/task/delete` | Delete each task as soon as its results are delivered, which also deletes its uploaded photo and outputs | — |
 
 A photo analysis costs 22 units (23 with the hairline photo); a YouCam preview costs 2 (promise + result). The
 forecast itself comes from DyeCast's own deterministic color-chemistry engine: **YouCam provides the perception (your
@@ -139,8 +139,9 @@ Server actions recompute every report from validated input; the browser's foreca
   browser).
 - Selfies are re-encoded in the browser before upload, which strips EXIF (GPS, camera) and downsizes them.
 - Upload requires explicit consent. The server re-validates type by magic bytes, size and dimensions.
-- YouCam tasks are deleted right after results are delivered. Render URLs never reach the browser: images stream
-  through the server once, then the URL is discarded.
+- Each YouCam task gets its own upload, and the task is deleted right after its results are delivered, which also
+  deletes that uploaded photo at YouCam. Render URLs never reach the browser: images stream through the server once,
+  then the URL is discarded.
 - Stored selfies are **off by default**. If enabled: AES-256-GCM with a per-user data key, wrapped by a server key
   that never sits in the database; the ciphertext is bound to the user and photo (AAD), auto-deleted after 30 days,
   served with `no-store`. Deleting destroys the user's key (crypto-shredding).
@@ -185,7 +186,7 @@ Open http://localhost:3000, register, describe your hair, and check a shade or g
 | `APP_URL` | Public base URL, used for the Google redirect URI |
 | `YOUCAM_API_KEY` | YouCam API key (leave empty for demo mode) |
 | `YOUCAM_MOCK` | `1` forces demo mode even with a key |
-| `YOUCAM_DAILY_UNITS_PER_USER`, `YOUCAM_MIN_REMAINING_UNITS` | Budget guards (defaults 80 and 60) |
+| `YOUCAM_DAILY_UNITS_PER_USER`, `YOUCAM_DAILY_UNITS_TOTAL`, `YOUCAM_MIN_REMAINING_UNITS` | Budget guards: per user per day, all users per day, and a reserve that is never spent (defaults 80, 300 and 60) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in; the button appears only when both are set |
 | `PHOTO_ENCRYPTION_KEY` | 32-byte base64 key that wraps per-user photo keys; empty disables photo storage |
 | `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` | Database (local SQLite file by default) |
@@ -239,7 +240,11 @@ with crypto-shredding, and account deletion.
 
 - DyeCast is a rule-based forecast from general hair-color chemistry, not a per-brand formula model, and it makes no
   measured accuracy claim yet. Shades are generic references by level and tone; brands vary.
-- Photos read hair darker or lighter depending on light, which is why photo values are only suggestions.
+- Photos read hair darker or lighter depending on light, which is why photo values are only suggestions. YouCam's hair
+  color class can also misread warm light (it called very dark brown hair "Auburn" in testing), so a red class only
+  counts when the on-device measurement agrees.
+- Photo try-ons keep very dark hair's natural depth: on near-black hair even YouCam's "Platinum Blonde" preset renders
+  as a dark olive. Much lighter boxes therefore look darker in the photo than on the box; the swatches show true colors.
 - Email/password accounts don't have email verification or password reset yet; Google sign-in covers verified
   identity, and a Google sign-in can recover an account with the same email.
 - It is not medical advice. The product's instructions, the allergy alert test and a strand test always come first;

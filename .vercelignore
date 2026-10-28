@@ -1,0 +1,9 @@
+# Never upload local secrets, the local database or build output with `vercel deploy`.
+.env*
+!.env.example
+data/
+.next/
+node_modules/
+coverage/
+*.tsbuildinfo
+next-env.d.ts

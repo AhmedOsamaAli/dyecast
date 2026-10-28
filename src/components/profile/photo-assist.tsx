@@ -85,7 +85,7 @@ export function PhotoAssist({ mockMode, storePhotos, onApply }: {
 
       setProgress("Analyzing with YouCam AI…");
       const started = await analyzePhoto(photo.blob, densityPhoto?.blob);
-      await putLocal(SELFIE_KEY, { blob: photo.blob, savedAt: Date.now(), fileId: started.fileId });
+      await putLocal(SELFIE_KEY, { blob: photo.blob, savedAt: Date.now() });
       const [tone, length, density, measured] = await Promise.all([
         waitForTask<ToneResults>("skin-tone-analysis", started.tasks.tone),
         waitForTask<TermResults>("hair-length-detection", started.tasks.length),

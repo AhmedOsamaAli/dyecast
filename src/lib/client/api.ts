@@ -3,7 +3,6 @@
 export type AnalysisFeature = "skin-tone-analysis" | "hair-length-detection" | "hair-density-detection";
 
 export interface AnalyzeResponse {
-  fileId: string;
   mock: boolean;
   tasks: { tone: string; length: string; density?: string };
   storedUntil?: string;
@@ -92,7 +91,10 @@ export async function deleteStoredPhotos(): Promise<void> {
   await readJson(await fetch("/api/photos/selfie", { method: "DELETE" }));
 }
 
-/** Uploads a photo for try-on renders only (no analysis units). */
+/**
+ * Uploads a photo for one try-on render (no analysis units). Every YouCam task needs its own
+ * upload: deleting a finished task also deletes its input file.
+ */
 export async function uploadPhoto(photo: Blob): Promise<{ fileId: string; mock: boolean }> {
   const form = new FormData();
   form.set("consent", "yes");

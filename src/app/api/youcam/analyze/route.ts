@@ -45,10 +45,15 @@ export async function POST(request: Request): Promise<Response> {
   if (density && !density.check.ok) return apiError(`Hair density photo: ${density.check.error}`, 400, "bad_photo");
 
   try {
-    const upload = await uploadForUser(user.id, selfie.bytes.buffer as ArrayBuffer, selfie.check.image.mime);
+    // One upload per task: YouCam deletes a task's input file when we delete the finished task.
+    const mime = selfie.check.image.mime;
+    const [toneUpload, lengthUpload] = await Promise.all([
+      uploadForUser(user.id, selfie.bytes.buffer as ArrayBuffer, mime),
+      uploadForUser(user.id, selfie.bytes.buffer as ArrayBuffer, mime),
+    ]);
     const [tone, length] = await Promise.all([
-      startTask(user.id, "skin-tone-analysis", { src_file_id: upload.fileId, face_angle_strictness_level: "medium" }),
-      startTask(user.id, "hair-length-detection", { src_file_id: upload.fileId }),
+      startTask(user.id, "skin-tone-analysis", { src_file_id: toneUpload.fileId, face_angle_strictness_level: "medium" }),
+      startTask(user.id, "hair-length-detection", { src_file_id: lengthUpload.fileId }),
     ]);
     let densityTask: string | undefined;
     if (density?.check.ok) {
@@ -59,14 +64,12 @@ export async function POST(request: Request): Promise<Response> {
     const [settings] = await db.select({ storePhotos: users.storePhotos }).from(users).where(eq(users.id, user.id)).limit(1);
     let storedUntil: string | undefined;
     if (settings?.storePhotos && photoStorageAvailable()) {
-      const mime = selfie.check.image.mime;
       const bytes = Buffer.from(selfie.bytes);
       storedUntil = (await saveSelfie(user.id, bytes, mime)).expiresAt.toISOString();
     }
 
     return json({
-      fileId: upload.fileId,
-      mock: upload.mock,
+      mock: toneUpload.mock,
       tasks: { tone: tone.taskId, length: length.taskId, density: densityTask },
       storedUntil,
     });

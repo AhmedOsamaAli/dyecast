@@ -11,6 +11,7 @@ import { rateLimit } from "@/lib/auth/rate-limit";
 import { destroyAllSessions, destroyCurrentSession, requireUser } from "@/lib/auth/session";
 import { fieldErrors, passwordSchema, type FieldErrors } from "@/lib/auth/validation";
 import { deleteAllPhotos, photoStorageAvailable } from "@/lib/photos/store";
+import { forgetUserRenders } from "@/lib/youcam/service";
 
 export interface SettingsState {
   error?: string;
@@ -82,6 +83,7 @@ export async function deleteAccount(_previous: SettingsState, form: FormData): P
     return { error: "Type DELETE to confirm.", fields: { confirm: ["Type DELETE to confirm."] } };
   }
   await deleteAllPhotos(user.id);
+  await forgetUserRenders(user.id);
   await db.delete(users).where(eq(users.id, user.id));
   await destroyCurrentSession();
   redirect("/?notice=account_deleted");

@@ -17,7 +17,7 @@ export default function PrivacyPage() {
         <li><strong>Cleaned in your browser.</strong> Before upload, your photo is re-encoded on your device, which strips location (GPS), camera and other hidden metadata, and downsized.</li>
         <li><strong>Measured on your device.</strong> Hair color is measured in your browser with on-device AI. Box photos (for reading shade codes) and inspiration photos never leave your device at all.</li>
         <li><strong>Analyzed by YouCam.</strong> To suggest your hair color class, length and density, and to render try-on previews, a copy is sent over HTTPS to YouCam (Perfect Corp). Only after you tick the consent box.</li>
-        <li><strong>Deleted from YouCam right away.</strong> As soon as we receive an analysis or a preview, we ask YouCam to delete that task and its images. YouCam keeps uploaded source files for up to 30 days, then removes them automatically.</li>
+        <li><strong>Deleted from YouCam right away.</strong> As soon as we receive an analysis or a preview, we ask YouCam to delete that task, which also deletes the photo copy uploaded for it and the images it produced. Each task gets its own copy, so nothing lingers for reuse. A copy whose task never ran is removed by YouCam automatically within 30 days.</li>
         <li><strong>Previews are delivered once.</strong> Rendered images pass through our server to you; their download links never reach your browser and aren&apos;t stored.</li>
       </ul>
 

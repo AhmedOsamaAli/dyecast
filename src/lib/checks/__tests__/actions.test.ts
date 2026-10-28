@@ -36,7 +36,7 @@ vi.mock("@/lib/db/client", async () => {
 });
 
 import { db } from "@/lib/db/client";
-import { hairProfiles, oauthAccounts, photos, rateLimits, savedChecks, sessions, users } from "@/lib/db/schema";
+import { apiUsage, hairProfiles, oauthAccounts, photos, rateLimits, savedChecks, sessions, users } from "@/lib/db/schema";
 import { login, logout, register } from "@/app/auth-actions";
 import { saveProfile } from "@/app/profile/actions";
 import { createCheck, deleteCheck } from "@/app/check/actions";
@@ -250,12 +250,19 @@ describe("photo storage and account deletion", () => {
     await signup();
     await saveDefaultProfile();
     await expect(createCheck({}, form(target))).rejects.toThrow("REDIRECT:/checks/");
+    const [owner] = await db.select().from(users);
+    await db.insert(apiUsage).values({
+      id: "usage-1", userId: owner.id, feature: "hair-color", units: 1, taskId: "task_render_1", status: "success", mock: false,
+      resultUrl: "https://yce-us.s3-accelerate.amazonaws.com/ttl30/render.png?X-Amz-Signature=abc", createdAt: new Date(),
+    });
     expect((await deleteAccount({}, form({ confirm: "nope" }))).error).toBeTruthy();
     await expect(deleteAccount({}, form({ confirm: "delete" }))).rejects.toThrow("REDIRECT:/?notice=account_deleted");
     expect(await db.select().from(users)).toHaveLength(0);
     expect(await db.select().from(hairProfiles)).toHaveLength(0);
     expect(await db.select().from(savedChecks)).toHaveLength(0);
     expect(await db.select().from(sessions)).toHaveLength(0);
+    // Usage rows stay for the shared daily budget, but without an owner or a link to the render.
+    expect(await db.select({ userId: apiUsage.userId, resultUrl: apiUsage.resultUrl }).from(apiUsage)).toEqual([{ userId: null, resultUrl: null }]);
     expect(request.cookies.has(SESSION_COOKIE)).toBe(false);
   });
 });

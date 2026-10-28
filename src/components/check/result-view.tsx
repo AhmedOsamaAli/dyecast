@@ -80,7 +80,7 @@ export function ResultView({ id, input, report, hasStoredSelfie }: {
       )}
 
       <PhotoPreview checkId={id} promiseHex={p.promise.hex} rootsHex={p.roots.hex} lengthsHex={p.lengths.hex}
-        twoZone={p.twoZone} hasStoredSelfie={hasStoredSelfie} />
+        twoZone={p.twoZone} hasStoredSelfie={hasStoredSelfie} muchLighter={p.promise.level - input.lengthsLevel >= 3} />
 
       <div className="result-columns">
         <section className="panel">

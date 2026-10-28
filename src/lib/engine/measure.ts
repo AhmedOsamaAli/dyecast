@@ -81,10 +81,14 @@ export function suggestFromLab(lab: Lab, hairClass?: string): LevelSuggestion {
   const ref = naturalLab(level);
   const refChroma = Math.hypot(ref.a, ref.b);
   const hue = (Math.atan2(lab.b, lab.a) * 180) / Math.PI;
+  // YouCam's class can mistake warm light for red hair (it called very dark brown hair "Auburn" in a live test),
+  // so a red class only counts when the measured color shows some warmth too.
+  const redClass = hairClass === "Red" || hairClass === "Auburn";
   let tone: HairTone = "neutral";
-  if (hairClass === "Red" || hairClass === "Auburn" || (chroma > refChroma + 8 && hue < 52)) tone = "red";
+  if ((chroma > refChroma + 8 && hue < 52) || (redClass && chroma > refChroma + 3 && hue < 65)) tone = "red";
   else if (chroma > refChroma + 4) tone = "warm";
-  else if (!grayMix && chroma < refChroma * 0.55) tone = "cool";
+  // Very dark hair always looks desaturated in photos, so "cool" is only suggested from level 4 up.
+  else if (!grayMix && level >= 4 && chroma < refChroma * 0.55) tone = "cool";
   return {
     level: roundLevel(level),
     rawLevel: raw,

@@ -1,7 +1,8 @@
 import "server-only";
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, isNotNull, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { apiUsage, youcamFiles } from "@/lib/db/schema";
+import { sniffImage } from "@/lib/photos/validate";
 import {
   createTask,
   deleteTask,
@@ -17,6 +18,8 @@ import { FEATURE_UNITS, type HairColorResults, type TaskResult, type YouCamFeatu
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DAILY_UNITS_PER_USER = Number(process.env.YOUCAM_DAILY_UNITS_PER_USER ?? 80);
+/** Cap across all users, so a public demo can't drain the account's free units in one day. */
+const DAILY_UNITS_TOTAL = Number(process.env.YOUCAM_DAILY_UNITS_TOTAL ?? 300);
 const MIN_REMAINING_UNITS = Number(process.env.YOUCAM_MIN_REMAINING_UNITS ?? 60);
 const BALANCE_CACHE_MS = 60_000;
 const MAX_RENDER_BYTES = 10 * 1024 * 1024;
@@ -32,12 +35,17 @@ async function remainingUnits(): Promise<number> {
 
 /** Units this user spent (or has in flight) in the last 24 hours. */
 export async function unitsUsedToday(userId: string): Promise<number> {
+  return unitsSpentSince(eq(apiUsage.userId, userId));
+}
+
+/** Units spent (or in flight) in the last 24 hours, optionally for one user only. */
+async function unitsSpentSince(scope?: SQL): Promise<number> {
   const [row] = await db
     .select({ total: sql<number>`coalesce(sum(${apiUsage.units}), 0)` })
     .from(apiUsage)
     .where(
       and(
-        eq(apiUsage.userId, userId),
+        scope,
         eq(apiUsage.mock, false),
         gte(apiUsage.createdAt, new Date(Date.now() - DAY_MS)),
         sql`${apiUsage.status} != 'error'`,
@@ -91,6 +99,9 @@ export async function startTask(
         "daily_budget",
         429,
       );
+    }
+    if ((await unitsSpentSince()) + units > DAILY_UNITS_TOTAL) {
+      throw new YouCamError("Live photo analysis is busy today. Try again tomorrow — color forecasts still work.", "global_daily_budget", 503);
     }
     if ((await remainingUnits()) - units < MIN_REMAINING_UNITS) {
       throw new YouCamError("Live photo analysis is paused to protect the demo budget. Color forecasts still work.", "global_floor", 503);
@@ -154,14 +165,23 @@ export async function takeRender(userId: string, taskId: string): Promise<{ byte
     throw new YouCamError("This render is no longer available. Run the preview again.", "render_gone", 410);
   }
   const res = await fetch(usage.resultUrl, { cache: "no-store", redirect: "error", signal: AbortSignal.timeout(20_000) });
-  const contentType = (res.headers.get("content-type") ?? "").split(";")[0].trim();
-  if (!res.ok || !/^image\/(jpeg|png|webp)$/.test(contentType)) {
-    throw new YouCamError("The render could not be downloaded.", "render_download", 502, true);
-  }
+  if (!res.ok) throw new YouCamError("The render could not be downloaded.", "render_download", 502, true);
   const bytes = await res.arrayBuffer();
   if (bytes.byteLength > MAX_RENDER_BYTES) throw new YouCamError("The render is too large.", "render_size", 502);
+  // YouCam's storage labels renders "binary/octet-stream", so the format is read from the bytes themselves.
+  const image = sniffImage(new Uint8Array(bytes));
+  if (!image) throw new YouCamError("The render could not be read.", "render_download", 502, true);
   await db.update(apiUsage).set({ resultUrl: null }).where(eq(apiUsage.id, usage.id));
-  return { bytes, contentType };
+  return { bytes, contentType: image.mime };
+}
+
+/** Account deletion: drop stored render links and ask YouCam to delete those tasks (best effort). */
+export async function forgetUserRenders(userId: string): Promise<void> {
+  const pending = and(eq(apiUsage.userId, userId), isNotNull(apiUsage.resultUrl));
+  const rows = await db.select({ taskId: apiUsage.taskId }).from(apiUsage).where(pending);
+  if (!rows.length) return;
+  await db.update(apiUsage).set({ resultUrl: null }).where(pending);
+  await Promise.allSettled(rows.map((row) => forgetRemoteTask(row.taskId)));
 }
 
 /** Best-effort removal of a task's results from YouCam once we've delivered them. */

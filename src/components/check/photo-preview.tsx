@@ -13,6 +13,8 @@ interface Props {
   lengthsHex: string;
   twoZone: boolean;
   hasStoredSelfie: boolean;
+  /** The box is 3+ levels lighter than the hair today, beyond what a photo try-on can show. */
+  muchLighter?: boolean;
 }
 
 type Engine = "youcam" | "device";
@@ -22,8 +24,6 @@ interface Renders {
   engine: Engine;
 }
 
-const FILE_ID_MAX_AGE = 20 * 24 * 60 * 60 * 1000;
-
 async function deviceRender(photo: Blob, roots: string, lengths: string, rootsShare: number): Promise<Blob> {
   const { segmentHair, hasHair, recolorHair, canvasToBlob } = await import("@/lib/client/hair-vision");
   const canvas = await blobToCanvas(photo);
@@ -32,7 +32,7 @@ async function deviceRender(photo: Blob, roots: string, lengths: string, rootsSh
   return canvasToBlob(recolorHair(canvas, mask, { roots, lengths, rootsShare }));
 }
 
-export function PhotoPreview({ checkId, promiseHex, rootsHex, lengthsHex, twoZone, hasStoredSelfie }: Props) {
+export function PhotoPreview({ checkId, promiseHex, rootsHex, lengthsHex, twoZone, hasStoredSelfie, muchLighter = false }: Props) {
   const [selfie, setSelfie] = useState<LocalEntry | null>(null);
   const [selfieUrl, setSelfieUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,7 +63,7 @@ export function PhotoPreview({ checkId, promiseHex, rootsHex, lengthsHex, twoZon
         setSelfieUrl(track(entry.blob));
       }
       if (promise && reality) {
-        setRenders({ promise: track(promise.blob), reality: track(reality.blob), engine: (promise.fileId as Engine) ?? "device" });
+        setRenders({ promise: track(promise.blob), reality: track(reality.blob), engine: promise.engine ?? "device" });
       }
       setLoading(false);
     })();
@@ -75,9 +75,8 @@ export function PhotoPreview({ checkId, promiseHex, rootsHex, lengthsHex, twoZon
   }, [checkId, hasStoredSelfie]);
 
   async function save(promise: Blob, reality: Blob, engine: Engine) {
-    // The engine label is stored in the fileId slot of the local entry.
-    await putLocal(renderKey(checkId, "promise"), { blob: promise, savedAt: Date.now(), fileId: engine });
-    await putLocal(renderKey(checkId, "reality"), { blob: reality, savedAt: Date.now(), fileId: engine });
+    await putLocal(renderKey(checkId, "promise"), { blob: promise, savedAt: Date.now(), engine });
+    await putLocal(renderKey(checkId, "reality"), { blob: reality, savedAt: Date.now(), engine });
     setRenders({ promise: track(promise), reality: track(reality), engine });
   }
 
@@ -102,19 +101,14 @@ export function PhotoPreview({ checkId, promiseHex, rootsHex, lengthsHex, twoZon
     if (!selfie || !consent) return;
     setError("");
     try {
-      let fileId = selfie.fileId && Date.now() - selfie.savedAt < FILE_ID_MAX_AGE ? selfie.fileId : undefined;
-      if (!fileId) {
-        setBusy("Uploading your photo securely…");
-        fileId = (await uploadPhoto(selfie.blob)).fileId;
-        const updated = { ...selfie, fileId, savedAt: Date.now() };
-        setSelfie(updated);
-        await putLocal(SELFIE_KEY, updated);
-      }
+      // Each render gets its own upload: deleting a finished task at YouCam also deletes its input photo.
+      setBusy("Uploading your photo securely…");
+      const [promiseFile, realityFile] = await Promise.all([uploadPhoto(selfie.blob), uploadPhoto(selfie.blob)]);
       setBusy("YouCam AI is coloring your hair…");
-      const promiseReq: RenderRequest = { fileId, mode: "full", color: promiseHex, intensity: 85, shine: 40 };
+      const promiseReq: RenderRequest = { fileId: promiseFile.fileId, mode: "full", color: promiseHex, intensity: 85, shine: 40 };
       const realityReq: RenderRequest = twoZone
-        ? { fileId, mode: "ombre", top: rootsHex, bottom: lengthsHex, intensity: 85, shine: 30, blend: 55, offset: -0.45 }
-        : { fileId, mode: "full", color: lengthsHex, intensity: 85, shine: 30 };
+        ? { fileId: realityFile.fileId, mode: "ombre", top: rootsHex, bottom: lengthsHex, intensity: 85, shine: 30, blend: 55, offset: -0.45 }
+        : { fileId: realityFile.fileId, mode: "full", color: lengthsHex, intensity: 85, shine: 30 };
       const [p, r] = await Promise.all([startRender(promiseReq), startRender(realityReq)]);
       const [pDone, rDone] = await Promise.all([waitForTask("hair-color", p.taskId), waitForTask("hair-color", r.taskId)]);
       if (pDone.status !== "success" || rDone.status !== "success") throw new ApiError(pDone.error ?? rDone.error ?? "YouCam couldn't color this photo.", "render", 0);
@@ -167,6 +161,7 @@ export function PhotoPreview({ checkId, promiseHex, rootsHex, lengthsHex, twoZon
       {renders && (
         <p className="small muted">
           {renders.engine === "youcam" ? "Rendered with YouCam AI Hair Color; the images were deleted from YouCam after delivery." : "Rendered on this device; the photo never left your browser."} Previews are illustrations, not guarantees.
+          {renders.engine === "youcam" && muchLighter && " Photo try-ons keep your hair's natural depth, so a much lighter box looks darker here than on the box — the swatch above shows its true color."}
         </p>
       )}
       <label className="check-row small">
