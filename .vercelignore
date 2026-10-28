@@ -1,9 +1,10 @@
 # Never upload local secrets, the local database or build output with `vercel deploy`.
+# Anchored with "/" where needed: a bare "data/" would also drop src/data (goal colors, examples, shades).
 .env*
 !.env.example
-data/
-.next/
-node_modules/
-coverage/
+/data/
+/.next/
+/node_modules/
+/coverage/
 *.tsbuildinfo
 next-env.d.ts
