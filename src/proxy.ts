@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth/session-cookie";
 
-const PROTECTED = ["/check", "/checks", "/profile", "/history", "/settings"];
+const PROTECTED = ["/check", "/checks", "/choose", "/profile", "/history", "/settings"];
 
 /**
  * Optimistic redirect only (cookie presence). Every protected page, action and route handler

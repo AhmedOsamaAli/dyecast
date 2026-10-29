@@ -108,6 +108,14 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             );
           })}
         </div>
+        <Link className="choose-cta" href={user ? "/choose" : "/register"}>
+          <Sparkles size={22} aria-hidden="true" />
+          <span>
+            <strong>Not sure yet? Let us help you choose.</strong>
+            <small>Three quick questions, then your best-fit colors worked out on your own hair, and the boxes to buy.</small>
+          </span>
+          <span className="button compact">Help me choose <ArrowRight size={15} aria-hidden="true" /></span>
+        </Link>
       </section>
 
       <section id="how-it-works" className="how-section">

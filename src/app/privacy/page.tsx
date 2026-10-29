@@ -14,6 +14,7 @@ export default function PrivacyPage() {
 
       <h2>What happens when you use a photo</h2>
       <ul>
+        <li><strong>Camera or upload, your choice.</strong> You can take the photo with your phone&apos;s camera or your computer&apos;s webcam, or upload one. The live camera view never leaves your browser, and the camera turns off as soon as the photo is taken.</li>
         <li><strong>Cleaned in your browser.</strong> Before upload, your photo is re-encoded on your device, which strips location (GPS), camera and other hidden metadata, and downsized.</li>
         <li><strong>Measured on your device.</strong> Hair color is measured in your browser with on-device AI. Box photos (for reading shade codes) and inspiration photos never leave your device at all.</li>
         <li><strong>Analyzed by YouCam.</strong> To suggest your hair color class, length and density, and to render try-on previews, a copy is sent over HTTPS to YouCam (Perfect Corp). Only after you tick the consent box.</li>

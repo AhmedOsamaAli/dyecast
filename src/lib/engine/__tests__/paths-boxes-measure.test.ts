@@ -3,7 +3,7 @@ import { naturalLab } from "../levels";
 import { hexToLab } from "@/lib/color";
 import { boxesNeeded, densityFromYouCam, lengthFromYouCam } from "../boxes";
 import { findPaths } from "../get-there";
-import { CAMERA_L_OFFSET, robustHairLab, suggestFromHairClass, suggestFromLab } from "../measure";
+import { CAMERA_L_OFFSET, readHair, robustHairLab, suggestFromHairClass, suggestFromLab } from "../measure";
 import { decodeShade } from "../shade-code";
 import { shadeIdealLab, describedHairLab } from "../predict";
 import type { HairProfileInput } from "../types";
@@ -114,5 +114,34 @@ describe("measurement suggestions", () => {
   it("keeps red when the class and the measurement agree", () => {
     const red = describedHairLab(6, "red");
     expect(suggestFromLab({ ...red, L: red.L - CAMERA_L_OFFSET }, "Red").tone).toBe("red");
+  });
+
+  it("never reads dull dark brown hair as gray or ash (photos make dark hair look flat)", () => {
+    // Dark brown hair in an ordinary phone photo: dark and nearly colorless.
+    const dull = { L: 26, a: 2, b: 3 };
+    const evidence = readHair(Array.from({ length: 200 }, (_, i) => ({ L: 20 + (i % 12), a: 2, b: 3 })));
+    for (const s of [suggestFromLab(dull), suggestFromLab(dull, "Brown"), suggestFromLab(dull, undefined, evidence!)]) {
+      expect(s.suggestGray).toBeUndefined();
+      expect(s.level).toBe(4);
+      expect(s.tone).toBe("neutral");
+    }
+    // A dull medium brown still isn't called ash: that's only suggested for blondes.
+    const medium = naturalLab(5);
+    expect(suggestFromLab({ L: medium.L - CAMERA_L_OFFSET, a: 1.5, b: 3 }, "Brown").tone).toBe("neutral");
+  });
+
+  it("sees salt and pepper in the strands and reads the level from the pigmented ones", () => {
+    const pepper = Array.from({ length: 120 }, () => ({ L: 18, a: 3, b: 6 }));
+    const salt = Array.from({ length: 80 }, () => ({ L: 74, a: 0.5, b: 3 }));
+    const reading = readHair([...pepper, ...salt])!;
+    expect(reading.grayPixels).toBeCloseTo(0.4);
+    expect(reading.darkPixels).toBeCloseTo(0.6);
+    expect(reading.pigmented).toEqual({ L: 18, a: 3, b: 6 });
+    const s = suggestFromLab(reading.lab, undefined, reading);
+    expect(s.suggestGray).toBe("some");
+    expect(s.level).toBe(3);
+    expect(suggestFromLab(reading.lab, "Grey/White", reading).suggestGray).toBe("half");
+    // When YouCam saw a hair color, partial gray is left for the person to set.
+    expect(suggestFromLab(reading.lab, "Black", reading).suggestGray).toBeUndefined();
   });
 });

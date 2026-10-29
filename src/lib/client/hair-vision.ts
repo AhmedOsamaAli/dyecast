@@ -2,7 +2,7 @@
 
 import type { ImageSegmenter } from "@mediapipe/tasks-vision";
 import { hexToLab, type Lab } from "@/lib/color";
-import { robustHairLab } from "@/lib/engine/measure";
+import { readHair, type HairReading } from "@/lib/engine/measure";
 
 const WASM_BASE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.1/wasm";
 const MODEL_URL =
@@ -97,8 +97,8 @@ function labPixel(L: number, a: number, b: number, data: Uint8ClampedArray, i: n
   data[i + 2] += (bl - data[i + 2]) * mix;
 }
 
-/** Robust median hair color from the confidently-hair pixels of a photo. */
-export function measureHair(canvas: HTMLCanvasElement, mask: HairMask): Lab | null {
+/** Hair color from the confidently-hair pixels of a photo: the robust typical color plus gray-strand evidence. */
+export function measureHair(canvas: HTMLCanvasElement, mask: HairMask): HairReading | null {
   const ctx = canvas.getContext("2d");
   if (!ctx || mask.width !== canvas.width || mask.height !== canvas.height) return null;
   const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -113,7 +113,7 @@ export function measureHair(canvas: HTMLCanvasElement, mask: HairMask): Lab | nu
       samples.push({ L: lab[0], a: lab[1], b: lab[2] });
     }
   }
-  return robustHairLab(samples);
+  return readHair(samples);
 }
 
 export interface RecolorTarget {

@@ -1,6 +1,6 @@
 import { clamp, type Lab } from "@/lib/color";
 import { levelFromLightness, naturalLab, roundLevel } from "./levels";
-import { UNPIGMENTED } from "./predict";
+import { GRAY_FRACTION, UNPIGMENTED } from "./predict";
 import type { GrayShare, HairTone } from "./types";
 
 /** Hair in selfies usually reads darker than salon swatches; tunable calibration in L* units. */
@@ -48,24 +48,71 @@ export function robustHairLab(pixels: Lab[]): Lab | null {
   return { L: median(kept.map((p) => p.L)), a: median(kept.map((p) => p.a)), b: median(kept.map((p) => p.b)) };
 }
 
-/** Turns a measured hair color (+ optional YouCam class) into suggestions the user then confirms or edits. */
-export function suggestFromLab(lab: Lab, hairClass?: string): LevelSuggestion {
-  const seen = lab.L + CAMERA_L_OFFSET;
-  let raw = levelFromLightness(seen);
-  let confidence = 0.7;
-  const chroma = Math.hypot(lab.a, lab.b);
+/** What a photo's hair pixels show beyond the typical color. */
+export interface HairEvidence {
+  /** Typical color of the pigmented strands, leaving out light, colorless (gray or white) pixels. */
+  pigmented: Lab | null;
+  /** Share of hair pixels that are light and almost colorless, like gray or white strands. */
+  grayPixels: number;
+  /** Share of hair pixels that are dark. */
+  darkPixels: number;
+}
 
-  // Salt-and-pepper hair: gray strands make the average lighter and almost colorless. Natural hair this light
-  // is never that desaturated (ash blondes keep about half their chroma), so estimate the level of the pigmented
-  // strands from the mix instead of reading the average as a lighter, ashy shade.
-  const seenRef = naturalLab(raw);
-  const grayMix = raw >= 4 && raw <= 9 && chroma < 7 && chroma < Math.hypot(seenRef.a, seenRef.b) * 0.35;
-  let suggestGray: GrayShare | undefined = hairClass === "Grey/White" ? "most" : undefined;
-  if (grayMix) {
-    const share = raw >= 8 ? 0.8 : 0.5;
-    raw = levelFromLightness((seen - share * UNPIGMENTED.L) / (1 - share));
-    suggestGray ??= share >= 0.8 ? "most" : "half";
+export interface HairReading extends HairEvidence {
+  /** Typical hair color (see robustHairLab). */
+  lab: Lab;
+}
+
+const chromaOf = (lab: Lab) => Math.hypot(lab.a, lab.b);
+const isGrayPixel = (p: Lab) => p.L >= 60 && chromaOf(p) <= 9;
+
+/** Typical hair color plus the gray-strand evidence, from the confidently-hair pixels of a photo. */
+export function readHair(pixels: Lab[]): HairReading | null {
+  const lab = robustHairLab(pixels);
+  if (!lab) return null;
+  const pigmented = pixels.filter((p) => !isGrayPixel(p));
+  return {
+    lab,
+    pigmented: robustHairLab(pigmented),
+    grayPixels: (pixels.length - pigmented.length) / pixels.length,
+    darkPixels: pixels.filter((p) => p.L <= 40).length / pixels.length,
+  };
+}
+
+/**
+ * Gray strands. Photos make dark hair look dull, so dullness alone never means gray. Gray is suggested when YouCam's
+ * class says Grey/White, or, without a class, when the photo shows many light colorless strands next to dark ones
+ * (salt and pepper). When YouCam saw a hair color, partial gray is left for the person to set.
+ */
+function graySuggestion(lab: Lab, hairClass: string | undefined, evidence?: HairEvidence): GrayShare | undefined {
+  if (hairClass === "Grey/White") return evidence && evidence.grayPixels < 0.5 ? "half" : "most";
+  if (isHairClass(hairClass)) return undefined;
+  if (evidence) {
+    if (evidence.grayPixels < 0.25 || evidence.darkPixels < 0.15) return undefined;
+    return evidence.grayPixels >= 0.45 ? "half" : "some";
+  }
+  // Without pixel evidence: an average this light and this colorless isn't natural pigment.
+  const raw = levelFromLightness(lab.L + CAMERA_L_OFFSET);
+  if (raw < 5 || chromaOf(lab) >= Math.min(7, chromaOf(naturalLab(raw)) * 0.3)) return undefined;
+  return raw >= 8 ? "most" : "half";
+}
+
+/** Turns a measured hair color (+ optional YouCam class and pixel evidence) into suggestions the user confirms. */
+export function suggestFromLab(lab: Lab, hairClass?: string, evidence?: HairEvidence): LevelSuggestion {
+  const suggestGray = graySuggestion(lab, hairClass, evidence);
+  let confidence = 0.7;
+  // With gray in the mix, read the level and tone from the pigmented strands.
+  let color = lab;
+  let raw = levelFromLightness(lab.L + CAMERA_L_OFFSET);
+  if (suggestGray) {
     confidence -= 0.15;
+    if (evidence?.pigmented) {
+      color = evidence.pigmented;
+      raw = levelFromLightness(color.L + CAMERA_L_OFFSET);
+    } else if (raw >= 4) {
+      const share = GRAY_FRACTION[suggestGray];
+      raw = levelFromLightness((lab.L + CAMERA_L_OFFSET - share * UNPIGMENTED.L) / (1 - share));
+    }
   }
 
   let level = raw;
@@ -78,17 +125,17 @@ export function suggestFromLab(lab: Lab, hairClass?: string): LevelSuggestion {
       adjusted = true;
     }
   }
-  const ref = naturalLab(level);
-  const refChroma = Math.hypot(ref.a, ref.b);
-  const hue = (Math.atan2(lab.b, lab.a) * 180) / Math.PI;
+  const chroma = chromaOf(color);
+  const refChroma = chromaOf(naturalLab(level));
+  const hue = (Math.atan2(color.b, color.a) * 180) / Math.PI;
   // YouCam's class can mistake warm light for red hair (it called very dark brown hair "Auburn" in a live test),
   // so a red class only counts when the measured color shows some warmth too.
   const redClass = hairClass === "Red" || hairClass === "Auburn";
   let tone: HairTone = "neutral";
   if ((chroma > refChroma + 8 && hue < 52) || (redClass && chroma > refChroma + 3 && hue < 65)) tone = "red";
   else if (chroma > refChroma + 4) tone = "warm";
-  // Very dark hair always looks desaturated in photos, so "cool" is only suggested from level 4 up.
-  else if (!grayMix && level >= 4 && chroma < refChroma * 0.55) tone = "cool";
+  // Photos make brown hair look duller than it is, so "cool" (ash) is only suggested for blondes, from level 6 up.
+  else if (!suggestGray && level >= 6 && chroma < refChroma * 0.55) tone = "cool";
   return {
     level: roundLevel(level),
     rawLevel: raw,

@@ -13,6 +13,9 @@ export interface ProfileState {
   fields?: FieldErrors;
 }
 
+/** Where to go after saving, from an allow-list (never a free-form URL). */
+const AFTER_SAVE: Record<string, string> = { choose: "/choose?profile=saved", check: "/check?profile=saved" };
+
 export async function saveProfile(_previous: ProfileState, form: FormData): Promise<ProfileState> {
   const user = await requireUser();
   const parsed = hairProfileSchema.safeParse(Object.fromEntries(form));
@@ -21,5 +24,6 @@ export async function saveProfile(_previous: ProfileState, form: FormData): Prom
   if (!limit.ok) return { error: `Please wait ${limit.retryAfterSeconds} seconds before saving again.` };
   await saveProfileFor(user.id, parsed.data);
   revalidatePath("/check");
-  redirect("/check?profile=saved");
+  revalidatePath("/choose");
+  redirect(AFTER_SAVE[String(form.get("next"))] ?? AFTER_SAVE.check);
 }

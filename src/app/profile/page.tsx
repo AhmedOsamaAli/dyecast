@@ -9,9 +9,10 @@ import { ProfileEditor } from "@/components/profile/profile-editor";
 
 export const metadata = { title: "Your hair profile" };
 
-export default async function ProfilePage() {
+export default async function ProfilePage({ searchParams }: PageProps<"/profile">) {
   const user = await requireUser();
   const saved = await getProfile(user.id);
+  const { next } = await searchParams;
   const [settings] = await db.select({ storePhotos: users.storePhotos }).from(users).where(eq(users.id, user.id)).limit(1);
   return (
     <main className="page-shell">
@@ -24,7 +25,12 @@ export default async function ProfilePage() {
             : `Hi ${user.displayName}. Tell us about your hair once — every check uses it.`}
         </p>
       </div>
-      <ProfileEditor initial={saved?.profile ?? DEFAULT_PROFILE} mockMode={isMockMode()} storePhotos={Boolean(settings?.storePhotos)} />
+      <ProfileEditor
+        initial={saved?.profile ?? DEFAULT_PROFILE}
+        mockMode={isMockMode()}
+        storePhotos={Boolean(settings?.storePhotos)}
+        next={next === "choose" ? "choose" : undefined}
+      />
     </main>
   );
 }

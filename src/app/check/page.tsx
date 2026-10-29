@@ -1,23 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Sparkles } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getProfile } from "@/lib/checks/store";
 import { CHECK_SOURCES, type CheckSource } from "@/lib/checks/validation";
-import { levelName } from "@/lib/engine/levels";
-import { todaySwatch } from "@/lib/engine/swatch";
 import { CheckWizard } from "@/components/check/check-wizard";
-import { HairSwatch } from "@/components/hair-swatch";
+import { ProfileChip } from "@/components/profile-chip";
 import { GOAL_COLORS } from "@/data/goals";
 
 export const metadata = { title: "Check a shade" };
-
-const HISTORY: Record<string, string> = {
-  virgin: "never colored",
-  dyed: "previously dyed",
-  highlighted: "highlighted",
-  bleached: "bleached",
-  henna: "henna or plant dye",
-};
 
 export default async function CheckPage({ searchParams }: PageProps<"/check">) {
   const user = await requireUser();
@@ -34,14 +25,11 @@ export default async function CheckPage({ searchParams }: PageProps<"/check">) {
         <div>
           <p className="eyebrow">YOUR COLOR STUDIO</p>
           <h1>What could this color really look like on you?</h1>
+          <p className="muted small">
+            Not sure what you want yet? <Link href="/choose" className="inline-link"><Sparkles size={14} aria-hidden="true" /> Help me choose</Link>
+          </p>
         </div>
-        <Link href="/profile" className="profile-chip">
-          <HairSwatch className="chip-swatch" {...todaySwatch(p)} label="Your hair" seed={3} />
-          <span>
-            <strong>Level {p.lengthsLevel} · {levelName(p.lengthsLevel)}</strong>
-            <small>{HISTORY[p.history]} · {p.gray === "none" ? "no gray" : `${p.gray} gray`} · edit</small>
-          </span>
-        </Link>
+        <ProfileChip profile={p} />
       </div>
       <CheckWizard profile={{ ...p, levelConfirmed: true }} initialMode={mode} initialGoal={goal ? { hex: goal.hex, name: goal.name } : undefined} />
     </main>

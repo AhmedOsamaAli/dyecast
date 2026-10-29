@@ -11,10 +11,12 @@ import { PhotoAssist, type PhotoSuggestions } from "./photo-assist";
 
 const shape = hairProfileSchema.shape;
 
-export function ProfileEditor({ initial, mockMode, storePhotos }: {
+export function ProfileEditor({ initial, mockMode, storePhotos, next }: {
   initial: HairProfileData;
   mockMode: boolean;
   storePhotos: boolean;
+  /** Where to continue after saving (an allow-listed page name). */
+  next?: "choose";
 }) {
   const [values, setValues] = useState<HairProfileData>(initial);
   const [suggested, setSuggested] = useState<number | undefined>(initial.measurement?.suggestedLevel);
@@ -110,6 +112,7 @@ export function ProfileEditor({ initial, mockMode, storePhotos }: {
             onChange={(v) => update("density", v)} error={state.fields?.density} />
         </div>
         <input type="hidden" name="measurement" value={values.measurement ? JSON.stringify(values.measurement) : ""} />
+        {next && <input type="hidden" name="next" value={next} />}
         {state.error && <p role="alert" className="notice danger">{state.error}</p>}
         <button className="button full" disabled={pending}>{pending ? "Saving…" : "Save my hair profile"}</button>
       </form>

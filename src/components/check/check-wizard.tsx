@@ -213,9 +213,9 @@ function GoalTab({ profile, target, initialGoal, onPick }: {
       const canvas = await blobToCanvas(prepared.blob);
       URL.revokeObjectURL(prepared.url);
       const mask = await segmentHair(canvas);
-      const lab = hasHair(mask) ? measureHair(canvas, mask) : null;
-      if (!lab) throw new Error("We couldn't find hair in that photo.");
-      setGoal({ hex: labToHex(lab), name: "Your inspiration photo" });
+      const reading = hasHair(mask) ? measureHair(canvas, mask) : null;
+      if (!reading) throw new Error("We couldn't find hair in that photo.");
+      setGoal({ hex: labToHex(reading.lab), name: "Your inspiration photo" });
       setMatching("");
     } catch (e) {
       setMatching(e instanceof Error ? e.message : "That photo didn't work.");

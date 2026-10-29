@@ -191,6 +191,14 @@ describe("profile and checks", () => {
     expect(await db.select().from(savedChecks)).toHaveLength(0);
   });
 
+  it("continues to Help me choose after saving, and never to an outside address", async () => {
+    await signup();
+    await expect(saveProfile({}, form({ ...DEFAULT_PROFILE, next: "choose" }))).rejects.toThrow("REDIRECT:/choose?profile=saved");
+    for (const next of ["https://evil.example", "//evil.example", "/settings"]) {
+      await expect(saveProfile({}, form({ ...DEFAULT_PROFILE, next }))).rejects.toThrow("REDIRECT:/check?profile=saved");
+    }
+  }, 30_000);
+
   it("stores goal checks with their route and keeps immutable snapshots per account", async () => {
     await signup();
     await saveDefaultProfile();

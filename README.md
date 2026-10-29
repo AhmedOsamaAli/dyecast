@@ -21,9 +21,16 @@ Built for the **YouCam API Skin AI & eCommerce VTO Hackathon**.
 
 1. **Describe your hair — no photo needed.** Ten levels shown as real-hair chips in your own tone, plus tone,
    color history (never colored, dyed, highlighted, bleached, henna), gray share, ends condition, texture, strand
-   thickness, length and density. Optionally, a selfie *suggests* values (on-device hair measurement + YouCam
-   analysis). You confirm every value; the forecast uses your choices, not raw pixels.
-2. **Choose what you're aiming for — four ways:**
+   thickness, length and density. Optionally, a selfie and a hairline photo *suggest* values (on-device hair
+   measurement + YouCam analysis). Take them with your phone's camera or your computer's webcam, or upload them. You
+   confirm every value; the forecast uses your choices, not raw pixels. A lighting check tells you when yellow indoor
+   light, a dark room or harsh light would skew the color.
+2. **Not sure yet? Help me choose.** Three quick questions (how big a change, how much upkeep, your skin's undertone,
+   suggested from your selfie's skin color or a gold-vs-silver jewelry question). DyeCast works every goal color out
+   on *your* hair and ranks your best fits with reasons and cautions: one box or box + toner (or a colorist), how soon
+   roots show, fading reds, cool blondes that need toning. Compare the top picks side by side on your own selfie,
+   recolored on your device.
+3. **Choose what you're aiming for — four ways:**
    - **My goal** — pick one of 16 goal colors, or match the hair in an inspiration photo (measured on your device).
      DyeCast searches box routes (shade, plus a toner when it helps) from *your* hair and shows how close each lands.
    - **Shade code** — `9.1`, `7/43`, `6G`, `5-0`… across international, Wella-style, Schwarzkopf-style and US letter
@@ -32,20 +39,20 @@ Built for the **YouCam API Skin AI & eCommerce VTO Hackathon**.
    - **Product link** — paste a store page; the server reads its title and product data safely and extracts shades.
 
    A **live forecast** updates while you choose.
-3. **Get your reality check:** a one-line verdict, a difference meter in plain words ("looks the same" →
+4. **Get your reality check:** a one-line verdict, a difference meter in plain words ("looks the same" →
    "noticeable" → "obvious") and what changes (depth, warmth, evenness), then today vs. box promise vs. likely result
    (roots and lengths separately, e.g. hot roots; highlights and gray drawn as their own strands, because they take dye
    differently), the color gap (ΔE2000) with a certainty label, rule-by-rule reasons, how many boxes your length and
    density need, better routes, a personal plan (decide → before → apply → after) and a safety checklist based on FDA,
    NHS and EU guidance.
-4. **See it on you:** YouCam AI Hair Color renders the box promise *and* your predicted result on your selfie
+5. **See it on you:** YouCam AI Hair Color renders the box promise *and* your predicted result on your selfie
    (an ombre render for two-zone results), or get a quick preview computed entirely on your device. Drag the
    before/after slider (mouse, touch or arrow keys) to compare *box vs. likely* or *today vs. likely*, and save each
    render.
-5. **Save and share your result:** one tap creates a 1080×1350 result card (your photos, or the hair swatches if you
+6. **Save and share your result:** one tap creates a 1080×1350 result card (your photos, or the hair swatches if you
    have none, plus the meter and key changes). Phones open the share sheet (Save image); computers download it.
    The card is drawn in your browser, so photos never touch our servers to make it.
-6. **Keep a private color notebook:** saved checks, history, data export and one-click account deletion.
+7. **Keep a private color notebook:** saved checks, history, data export and one-click account deletion.
 
 Every page works on phones and computers.
 
@@ -114,7 +121,7 @@ flowchart LR
 | [src/lib/client](src/lib/client) | Browser-only: photo cleaning, IndexedDB, MediaPipe, OCR, result card, API wrappers |
 | [src/lib/hair](src/lib/hair) | Hair swatch rendering: gradient-map color ramp and swatch layers (roots, highlight and gray strands) |
 | [src/app](src/app) | Pages, server actions and route handlers |
-| [src/components](src/components) | UI: real-hair swatches, before/after slider, check wizard, results, save card, profile editor |
+| [src/components](src/components) | UI: real-hair swatches, before/after slider, check wizard, Help me choose, camera, results, save card, profile editor |
 | [src/data](src/data) | Goal colors and worked examples |
 | [scripts](scripts) | Build-time tools: [hair-photo.mjs](scripts/hair-photo.mjs) makes the hair textures in `public/hair` |
 | [drizzle](drizzle) | SQL migrations |
@@ -145,6 +152,10 @@ checklist (FDA hair-dye checklist, NHS reaction and pregnancy guidance, EU label
 [boxes.ts](src/lib/engine/boxes.ts) the box count, [swatch.ts](src/lib/engine/swatch.ts) turns hair and forecasts into
 swatch colors (roots, highlight and gray strands), and [shade-code.ts](src/lib/engine/shade-code.ts) decodes codes and
 finds them in noisy OCR or page text (ignoring quantities such as `1.7 fl oz`, even when OCR reads it as `floz`).
+[recommend.ts](src/lib/engine/recommend.ts) powers Help me choose: it works every goal color out on the person's hair
+once (on the server), then ranks the results for each set of answers (in the browser) with plain reasons and cautions.
+[measure.ts](src/lib/engine/measure.ts) turns a photo's hair pixels into suggestions: gray is suggested only when
+YouCam's class says Grey/White or the strands show real salt and pepper, because photos make dark hair look dull.
 Server actions recompute every report from validated input; the browser's forecast is a preview, never trusted.
 
 ### Hair swatches
@@ -176,6 +187,8 @@ the script and in [texture.ts](src/lib/hair/texture.ts), then run `node scripts/
 - Photos are optional. A box photo or inspiration photo never leaves the device (OCR and hair measurement run in the
   browser).
 - Selfies are re-encoded in the browser before upload, which strips EXIF (GPS, camera) and downsizes them.
+- On computers, photos can be taken with the webcam in the page: the camera runs only while its live view shows and
+  stops as soon as the photo is taken; nothing is uploaded from the camera window.
 - Upload requires explicit consent. The server re-validates type by magic bytes, size and dimensions.
 - Each YouCam task gets its own upload, and the task is deleted right after its results are delivered, which also
   deletes that uploaded photo at YouCam. Render URLs never reach the browser: images stream through the server once,
@@ -255,7 +268,7 @@ low for a public demo.
 |---|---|
 | `npm run dev` | Development server |
 | `npm run build` / `npm start` | Production build and server |
-| `npm test` | Vitest suite (208 tests) |
+| `npm test` | Vitest suite (230 tests) |
 | `npm run typecheck` | TypeScript, no emit |
 | `npm run lint` | ESLint |
 | `npm run db:generate` / `npm run db:migrate` | Create / apply Drizzle migrations |

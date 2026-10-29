@@ -1,17 +1,22 @@
 "use client";
 
+import { ShieldCheck, Sun, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { labToHex } from "@/lib/color";
 import { densityFromYouCam, lengthFromYouCam, type DensityClass, type LengthClass } from "@/lib/engine/boxes";
 import { levelName } from "@/lib/engine/levels";
 import { suggestFromHairClass, suggestFromLab } from "@/lib/engine/measure";
+import { todaySwatch } from "@/lib/engine/swatch";
 import type { GrayShare, HairTone } from "@/lib/engine/types";
 import type { Measurement } from "@/lib/checks/validation";
 import { analyzePhoto, ApiError, waitForTask, type TermResults, type ToneResults } from "@/lib/client/api";
 import { blobToCanvas, prepareImage } from "@/lib/client/image";
 import { hasHair, measureHair, segmentHair } from "@/lib/client/hair-vision";
+import { checkPhotoLighting, type LightingAdvice } from "@/lib/client/lighting";
 import { putLocal, SELFIE_KEY } from "@/lib/client/local-store";
 import { TONE_LABELS } from "@/components/form-controls";
+import { HairSwatch } from "@/components/hair-swatch";
+import { PhotoSlot } from "@/components/profile/photo-slot";
 import { LENGTH_LABELS, DENSITY_LABELS } from "@/lib/engine/boxes";
 
 const GRAY_LABELS: Record<GrayShare, string> = {
@@ -44,12 +49,12 @@ export function PhotoAssist({ mockMode, storePhotos, onApply }: {
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
   const [result, setResult] = useState<PhotoSuggestions | null>(null);
+  const [lighting, setLighting] = useState<LightingAdvice | null>(null);
   const urls = useRef<string[]>([]);
 
   useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), []);
 
-  async function choose(file: File | undefined, kind: "selfie" | "density") {
-    if (!file) return;
+  async function choose(file: File, kind: "selfie" | "density") {
     setError("");
     try {
       const prepared = await prepareImage(file);
@@ -58,6 +63,7 @@ export function PhotoAssist({ mockMode, storePhotos, onApply }: {
         setPhoto({ blob: prepared.blob, url: prepared.url });
         setResult(null);
         setStatus("idle");
+        setLighting(await checkPhotoLighting(prepared.blob).catch(() => null));
       } else {
         setDensityPhoto({ blob: prepared.blob, url: prepared.url });
       }
@@ -94,7 +100,7 @@ export function PhotoAssist({ mockMode, storePhotos, onApply }: {
       ]);
 
       const hairClass = tone.status === "success" ? tone.results?.hairColorName : undefined;
-      const level = measured ? suggestFromLab(measured, hairClass) : hairClass ? suggestFromHairClass(hairClass) : null;
+      const level = measured ? suggestFromLab(measured.lab, hairClass, measured) : hairClass ? suggestFromHairClass(hairClass) : null;
       const suggestions: PhotoSuggestions = {
         level: level?.level,
         tone: level?.tone,
@@ -102,7 +108,7 @@ export function PhotoAssist({ mockMode, storePhotos, onApply }: {
         length: length.status === "success" ? lengthFromYouCam(length.results?.term) : undefined,
         density: density?.status === "success" ? densityFromYouCam(density.results?.term) : undefined,
         measurement: {
-          measuredHex: measured ? labToHex(measured) : undefined,
+          measuredHex: measured ? labToHex(measured.lab) : undefined,
           youcamHairHex: tone.results?.hairColor,
           youcamHairClass: hairClass,
           skinHex: tone.results?.skinColor,
@@ -129,34 +135,53 @@ export function PhotoAssist({ mockMode, storePhotos, onApply }: {
       <p className="eyebrow">OPTIONAL · FASTER</p>
       <h2 id="photo-assist-title">Let a photo suggest</h2>
       <p className="muted small">
-        A selfie can suggest your level, tone, length and density. You confirm everything — your choices, not the photo, drive the forecast.
+        Take a selfie here or upload one. It can suggest your level, tone, length and density. You confirm everything — your choices, not the photo, drive the forecast.
       </p>
       {mockMode && <p className="notice small">Demo mode: YouCam responses are simulated because no API key is configured.</p>}
 
-      <ul className="privacy-points small">
-        <li>Location and camera details (EXIF) are removed in your browser before upload.</li>
-        <li>Your hair color is also measured on this device; the photo stays here.</li>
-        <li>YouCam analyzes a copy, then we delete the results from YouCam right away.</li>
-        <li>{storePhotos ? "Your settings keep an encrypted copy for 30 days." : "We don't keep your photo. Turn on encrypted storage in Settings if you want to."}</li>
-      </ul>
+      <div className="photo-private">
+        <ShieldCheck size={20} aria-hidden="true" />
+        <p>
+          <strong>Your photo stays on this device.</strong> Taking or choosing a photo uploads nothing, and your hair color is
+          measured right here. Only when you tap <em>Analyze</em> does a cleaned copy (no location or camera data) go to YouCam,
+          which deletes it right after. {storePhotos ? "Your settings also keep an encrypted copy for 30 days." : "We don't keep it on our servers."}
+        </p>
+      </div>
+
+      <div className="photo-inputs">
+        <PhotoSlot
+          label="Selfie"
+          hint="face the camera, hair down, daylight"
+          preview={photo?.url}
+          previewAlt="Your selfie preview"
+          onPhoto={(file) => choose(file, "selfie")}
+          cameraTitle="Take a selfie"
+          cameraTip="Face a window in daylight, with your hair down and loose. No filters or beauty mode, so the color stays true."
+        />
+        <PhotoSlot
+          className="small-tile"
+          label="Hairline (optional)"
+          hint="head tilted down 45°"
+          preview={densityPhoto?.url}
+          previewAlt="Hairline photo preview"
+          onPhoto={(file) => choose(file, "density")}
+          cameraTitle="Take a hairline photo"
+          cameraTip="Face the camera in daylight, then lower your head about 45° so your whole hairline shows, hair loose. The photo is taken 3 seconds after you press the button."
+          countdown={3}
+        />
+      </div>
+
+      {lighting && (
+        <p className={`lighting-check ${lighting.ok ? "good" : "warn"}`} role="status">
+          {lighting.ok ? <Sun size={16} aria-hidden="true" /> : <TriangleAlert size={16} aria-hidden="true" />}
+          <span>{lighting.ok ? "Good light for true color." : lighting.issues[0].text}</span>
+        </p>
+      )}
 
       <label className="check-row">
         <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-        <span>I agree to my photo being processed to analyze my hair (YouCam by Perfect Corp).</span>
+        <span>Send a cleaned copy to YouCam (by Perfect Corp) to analyze my hair. It&apos;s deleted right after.</span>
       </label>
-
-      <div className="photo-inputs">
-        <label className={`upload-tile ${consent ? "" : "disabled"}`}>
-          {photo ? <img src={photo.url} alt="Your selfie preview" /> : <span>Selfie<br /><small>face the camera, hair down, daylight</small></span>}
-          <input type="file" accept="image/jpeg,image/png,image/webp,image/heic" capture="user" disabled={!consent}
-            onChange={(e) => choose(e.target.files?.[0], "selfie")} />
-        </label>
-        <label className={`upload-tile small-tile ${consent ? "" : "disabled"}`}>
-          {densityPhoto ? <img src={densityPhoto.url} alt="Hairline photo preview" /> : <span>Hairline (optional)<br /><small>head tilted down 45°</small></span>}
-          <input type="file" accept="image/jpeg,image/png,image/webp,image/heic" disabled={!consent}
-            onChange={(e) => choose(e.target.files?.[0], "density")} />
-        </label>
-      </div>
 
       <button type="button" className="button full" disabled={!consent || !photo || status === "working"} onClick={analyze}>
         {status === "working" ? progress || "Analyzing…" : "Analyze my photo"}
@@ -166,24 +191,45 @@ export function PhotoAssist({ mockMode, storePhotos, onApply }: {
       {result && (
         <div className="suggestions" aria-live="polite">
           <h3>What the photo suggests</h3>
+          {result.level !== undefined && (
+            <div className="suggestion-hero">
+              <HairSwatch
+                className="suggest-swatch"
+                {...todaySwatch({
+                  lengthsLevel: result.level,
+                  naturalLevel: result.level,
+                  currentTone: result.tone ?? "neutral",
+                  naturalTone: result.tone ?? "neutral",
+                  history: "virgin",
+                  gray: result.gray ?? "none",
+                })}
+                label={`Suggested hair color: level ${result.level}, ${levelName(result.level)}`}
+                seed={3}
+              />
+              <div>
+                <strong>Level {result.level} · {levelName(result.level)}</strong>
+                <span>{TONE_LABELS[result.tone ?? "neutral"]}{result.gray ? ` · gray: ${GRAY_LABELS[result.gray].toLowerCase()}` : ""}</span>
+                <small className="muted">Shown on real hair, as it looks in daylight.</small>
+              </div>
+            </div>
+          )}
           <dl>
-            {result.level !== undefined && (
-              <div><dt>Level</dt><dd>{result.level} · {levelName(result.level)}</dd></div>
-            )}
-            {result.tone && <div><dt>Tone</dt><dd>{TONE_LABELS[result.tone]}</dd></div>}
             {result.length && <div><dt>Length</dt><dd>{LENGTH_LABELS[result.length]}</dd></div>}
             {result.density && <div><dt>Density</dt><dd>{DENSITY_LABELS[result.density]}</dd></div>}
-            {result.gray && <div><dt>Gray</dt><dd>{GRAY_LABELS[result.gray]}</dd></div>}
             {result.measurement.youcamHairClass && <div><dt>YouCam hair color</dt><dd>{result.measurement.youcamHairClass}</dd></div>}
           </dl>
           {(result.measurement.measuredHex || result.measurement.youcamHairHex) && (
-            <div className="measure-chips">
-              {result.measurement.measuredHex && <span><i style={{ background: result.measurement.measuredHex }} /> Measured on device</span>}
-              {result.measurement.youcamHairHex && <span><i style={{ background: result.measurement.youcamHairHex }} /> YouCam class</span>}
-            </div>
+            <details className="camera-saw">
+              <summary>What the camera saw</summary>
+              <div className="measure-chips">
+                {result.measurement.measuredHex && <span><i style={{ background: result.measurement.measuredHex }} /> Measured on this device</span>}
+                {result.measurement.youcamHairHex && <span><i style={{ background: result.measurement.youcamHairHex }} /> YouCam&apos;s reading</span>}
+              </div>
+              <p className="small muted">Photos make hair look darker and duller than it does in daylight, so the suggestion corrects for the camera instead of copying these colors.</p>
+            </details>
           )}
           <button type="button" className="button secondary full" onClick={() => onApply(result)}>Use these suggestions</button>
-          <p className="small muted">Then check each choice against your hair in daylight — photos often read hair darker than it is.</p>
+          <p className="small muted">Then check each choice against your hair in daylight.</p>
         </div>
       )}
     </section>
