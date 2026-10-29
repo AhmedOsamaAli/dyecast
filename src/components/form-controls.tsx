@@ -4,6 +4,7 @@ import { labToHex } from "@/lib/color";
 import { levelName } from "@/lib/engine/levels";
 import { describedHairLab } from "@/lib/engine/predict";
 import type { HairTone } from "@/lib/engine/types";
+import { CHIP_TEXTURE } from "@/lib/hair/texture";
 
 export function SelectField<T extends string>({ name, label, value, choices, labels = {}, onChange, error, hint }: {
   name: string;
@@ -63,7 +64,7 @@ export function LevelPicker({ name, label, value, tone = "neutral", onChange, er
             key={level}
             type="button"
             className={`${Math.round(value) === level ? "selected" : ""} ${suggested !== undefined && Math.round(suggested) === level ? "suggested" : ""}`}
-            style={{ backgroundColor: labToHex(describedHairLab(level, tone)), color: level < 7 ? "#fff" : "#241c16" }}
+            style={{ backgroundColor: labToHex(describedHairLab(level, tone)), backgroundImage: `url(${CHIP_TEXTURE})`, color: level < 7 ? "#fff" : "#241c16" }}
             onClick={() => onChange(level)}
             aria-label={`Level ${level}: ${levelName(level)}${suggested !== undefined && Math.round(suggested) === level ? " (suggested by your photo)" : ""}`}
             aria-pressed={value === level}

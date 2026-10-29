@@ -7,6 +7,7 @@ import { levelName } from "@/lib/engine/levels";
 import { todaySwatch } from "@/lib/engine/swatch";
 import { CheckWizard } from "@/components/check/check-wizard";
 import { HairSwatch } from "@/components/hair-swatch";
+import { GOAL_COLORS } from "@/data/goals";
 
 export const metadata = { title: "Check a shade" };
 
@@ -24,6 +25,7 @@ export default async function CheckPage({ searchParams }: PageProps<"/check">) {
   if (!saved) redirect("/profile");
   const params = await searchParams;
   const mode = typeof params.mode === "string" && (CHECK_SOURCES as readonly string[]).includes(params.mode) ? (params.mode as CheckSource) : "goal";
+  const goal = typeof params.goal === "string" ? GOAL_COLORS.find((g) => g.id === params.goal) : undefined;
   const p = saved.profile;
   return (
     <main className="page-shell">
@@ -41,7 +43,7 @@ export default async function CheckPage({ searchParams }: PageProps<"/check">) {
           </span>
         </Link>
       </div>
-      <CheckWizard profile={{ ...p, levelConfirmed: true }} initialMode={mode} />
+      <CheckWizard profile={{ ...p, levelConfirmed: true }} initialMode={mode} initialGoal={goal ? { hex: goal.hex, name: goal.name } : undefined} />
     </main>
   );
 }

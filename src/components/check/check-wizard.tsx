@@ -15,6 +15,7 @@ import { TONE_SYSTEM_LABELS } from "@/lib/engine/tones";
 import type { DecodedShade, HairProfileInput, ProductType, ToneSystemId } from "@/lib/engine/types";
 import type { CheckSource } from "@/lib/checks/validation";
 import { blobToCanvas, prepareImage } from "@/lib/client/image";
+import { Camera, Hash, Link2, Target as TargetIcon, type LucideIcon } from "lucide-react";
 
 type Mode = CheckSource;
 
@@ -30,11 +31,11 @@ interface Target {
   productTitle?: string;
 }
 
-const MODES: Array<{ id: Mode; label: string; hint: string }> = [
-  { id: "goal", label: "My goal", hint: "Pick the color you want" },
-  { id: "code", label: "Shade code", hint: "Type the number on the box" },
-  { id: "box-photo", label: "Box photo", hint: "Read it from a photo" },
-  { id: "link", label: "Product link", hint: "Paste a store link" },
+const MODES: Array<{ id: Mode; label: string; hint: string; icon: LucideIcon }> = [
+  { id: "goal", label: "My goal", hint: "Pick the color you want", icon: TargetIcon },
+  { id: "code", label: "Shade code", hint: "Type the number on the box", icon: Hash },
+  { id: "box-photo", label: "Box photo", hint: "Read it from a photo", icon: Camera },
+  { id: "link", label: "Product link", hint: "Paste a store link", icon: Link2 },
 ];
 
 function systemFor(code: string, current: ToneSystemId): ToneSystemId {
@@ -50,7 +51,12 @@ const VERDICT: Record<string, string> = {
   "very-different": "Very different from the box",
 };
 
-export function CheckWizard({ profile, initialMode = "goal" }: { profile: HairProfileInput; initialMode?: Mode }) {
+export function CheckWizard({ profile, initialMode = "goal", initialGoal }: {
+  profile: HairProfileInput;
+  initialMode?: Mode;
+  /** Preselected goal color, e.g. from the "I want to…" tiles on the home page. */
+  initialGoal?: { hex: string; name: string };
+}) {
   const [mode, setMode] = useState<Mode>(initialMode);
   const [target, setTarget] = useState<Target>({ shadeCode: "", system: "international", product: "permanent", source: initialMode });
   const [choice, setChoice] = useState(0);
@@ -93,13 +99,14 @@ export function CheckWizard({ profile, initialMode = "goal" }: { profile: HairPr
         <div className="mode-tabs" role="tablist" aria-label="Ways to choose a shade">
           {MODES.map((m) => (
             <button key={m.id} type="button" role="tab" aria-selected={mode === m.id} className={mode === m.id ? "active" : ""} onClick={() => selectMode(m.id)}>
+              <m.icon size={18} aria-hidden="true" />
               <strong>{m.label}</strong>
               <span>{m.hint}</span>
             </button>
           ))}
         </div>
         <div role="tabpanel" className="mode-panel">
-          {mode === "goal" && <GoalTab profile={profile} target={target} onPick={(t) => set(t)} />}
+          {mode === "goal" && <GoalTab profile={profile} target={target} initialGoal={initialGoal} onPick={(t) => set(t)} />}
           {mode === "code" && <CodeTab target={target} onChange={set} />}
           {mode === "box-photo" && <BoxPhotoTab onPick={(t) => set({ ...t, source: "box-photo" })} />}
           {mode === "link" && <LinkTab onPick={(t) => set({ ...t, source: "link" })} />}
@@ -187,8 +194,13 @@ function CodeTab({ target, onChange }: { target: Target; onChange: (t: Partial<T
   );
 }
 
-function GoalTab({ profile, target, onPick }: { profile: HairProfileInput; target: Target; onPick: (t: Partial<Target>) => void }) {
-  const [goal, setGoal] = useState<{ hex: string; name: string } | null>(null);
+function GoalTab({ profile, target, initialGoal, onPick }: {
+  profile: HairProfileInput;
+  target: Target;
+  initialGoal?: { hex: string; name: string };
+  onPick: (t: Partial<Target>) => void;
+}) {
+  const [goal, setGoal] = useState<{ hex: string; name: string } | null>(initialGoal ?? null);
   const [matching, setMatching] = useState("");
   const paths = useMemo(() => (goal ? findPaths(profile, hexToLab(goal.hex), { limit: 3 }) : null), [profile, goal]);
 
@@ -213,10 +225,10 @@ function GoalTab({ profile, target, onPick }: { profile: HairProfileInput; targe
   return (
     <div className="goal-tab">
       <div className="goal-grid" role="radiogroup" aria-label="Goal colors">
-        {GOAL_COLORS.map((g) => (
+        {GOAL_COLORS.map((g, index) => (
           <button key={g.id} type="button" role="radio" aria-checked={goal?.hex === g.hex}
             className={`goal-option ${goal?.hex === g.hex ? "selected" : ""}`} onClick={() => setGoal({ hex: g.hex, name: g.name })}>
-            <HairSwatch lengths={g.hex} label={g.name} seed={g.level * 7} className="goal-swatch" />
+            <HairSwatch lengths={g.hex} label={g.name} seed={index} className="goal-swatch" />
             <span>{g.name}</span>
           </button>
         ))}

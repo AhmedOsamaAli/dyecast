@@ -19,7 +19,7 @@ Built for the **YouCam API Skin AI & eCommerce VTO Hackathon**.
 
 ## What you can do
 
-1. **Describe your hair — no photo needed.** Ten levels shown as realistic hair locks in your own tone, plus tone,
+1. **Describe your hair — no photo needed.** Ten levels shown as real-hair chips in your own tone, plus tone,
    color history (never colored, dyed, highlighted, bleached, henna), gray share, ends condition, texture, strand
    thickness, length and density. Optionally, a selfie *suggests* values (on-device hair measurement + YouCam
    analysis). You confirm every value; the forecast uses your choices, not raw pixels.
@@ -32,13 +32,26 @@ Built for the **YouCam API Skin AI & eCommerce VTO Hackathon**.
    - **Product link** — paste a store page; the server reads its title and product data safely and extracts shades.
 
    A **live forecast** updates while you choose.
-3. **Get your reality check:** today vs. box promise vs. likely result (roots and lengths separately, e.g. hot roots;
-   highlights and gray drawn as their own strands, because they take dye differently), the color gap (ΔE2000) with a
-   certainty label, rule-by-rule reasons, how many boxes your length and density need, better routes, a personal plan
-   (decide → before → apply → after) and a safety checklist based on FDA, NHS and EU guidance.
+3. **Get your reality check:** a one-line verdict, a difference meter in plain words ("looks the same" →
+   "noticeable" → "obvious") and what changes (depth, warmth, evenness), then today vs. box promise vs. likely result
+   (roots and lengths separately, e.g. hot roots; highlights and gray drawn as their own strands, because they take dye
+   differently), the color gap (ΔE2000) with a certainty label, rule-by-rule reasons, how many boxes your length and
+   density need, better routes, a personal plan (decide → before → apply → after) and a safety checklist based on FDA,
+   NHS and EU guidance.
 4. **See it on you:** YouCam AI Hair Color renders the box promise *and* your predicted result on your selfie
-   (an ombre render for two-zone results), or get a quick preview computed entirely on your device.
-5. **Keep a private color notebook:** saved checks, history, data export and one-click account deletion.
+   (an ombre render for two-zone results), or get a quick preview computed entirely on your device. Drag the
+   before/after slider (mouse, touch or arrow keys) to compare *box vs. likely* or *today vs. likely*, and save each
+   render.
+5. **Save and share your result:** one tap creates a 1080×1350 result card (your photos, or the hair swatches if you
+   have none, plus the meter and key changes). Phones open the share sheet (Save image); computers download it.
+   The card is drawn in your browser, so photos never touch our servers to make it.
+6. **Keep a private color notebook:** saved checks, history, data export and one-click account deletion.
+
+Every page works on phones and computers.
+
+**Real hair, not paint chips.** Every swatch is a photograph of real hair recolored to the exact forecast color, so you
+judge the result the way you'd judge hair: strands, depth and shine. Highlights and gray hairs are traced along the
+photo's own strands, and new-growth roots blend into the lengths. See [Hair swatches](#hair-swatches).
 
 No account? Open **`/examples`**: six common situations (dark brown to ash blonde from one box, a lighter box over old
 dye, covering lots of gray, bleached blonde back to brown, a same-level refresh, all-over color on highlights) forecast
@@ -98,10 +111,12 @@ flowchart LR
 | [src/lib/photos](src/lib/photos) | Photo validation, envelope encryption, 30-day retention, crypto-shredding |
 | [src/lib/youcam](src/lib/youcam) | YouCam client, per-user budgets and ownership checks, task deletion, demo mode |
 | [src/lib/product-link](src/lib/product-link) | SSRF-safe page fetching and shade extraction |
-| [src/lib/client](src/lib/client) | Browser-only: photo cleaning, IndexedDB, MediaPipe, OCR, API wrappers |
+| [src/lib/client](src/lib/client) | Browser-only: photo cleaning, IndexedDB, MediaPipe, OCR, result card, API wrappers |
+| [src/lib/hair](src/lib/hair) | Hair swatch rendering: gradient-map color ramp and swatch layers (roots, highlight and gray strands) |
 | [src/app](src/app) | Pages, server actions and route handlers |
-| [src/components](src/components) | UI: SVG hair swatches, check wizard, results, profile editor |
+| [src/components](src/components) | UI: real-hair swatches, before/after slider, check wizard, results, save card, profile editor |
 | [src/data](src/data) | Goal colors and worked examples |
+| [scripts](scripts) | Build-time tools: [hair-photo.mjs](scripts/hair-photo.mjs) makes the hair textures in `public/hair` |
 | [drizzle](drizzle) | SQL migrations |
 
 ### The engine
@@ -131,6 +146,29 @@ checklist (FDA hair-dye checklist, NHS reaction and pregnancy guidance, EU label
 swatch colors (roots, highlight and gray strands), and [shade-code.ts](src/lib/engine/shade-code.ts) decodes codes and
 finds them in noisy OCR or page text (ignoring quantities such as `1.7 fl oz`, even when OCR reads it as `floz`).
 Server actions recompute every report from validated input; the browser's forecast is a preview, never trusted.
+
+### Hair swatches
+
+The swatches start from one public-domain photograph of real hair (credited below).
+[scripts/hair-photo.mjs](scripts/hair-photo.mjs) turns it into textures in [public/hair](public/hair):
+
+- **A grayscale shading map.** The photo's large-scale lighting is flattened, then the average is mapped to gray 0.5.
+  This keeps the strands, clumps and shine.
+- **Strand masks.** Highlight sections and gray hairs (15–75%) are traced along the photo's own strand directions,
+  using a structure tensor. So they follow real strands. Gray masks are nested, so more gray adds strands.
+- **A small chip texture** for the level picker.
+
+At display time, [ramp.ts](src/lib/hair/ramp.ts) builds a gradient map for each color, in CIELAB:
+
+- gray 0.5 becomes exactly the forecast color;
+- darker grays fall into shadow;
+- lighter grays rise to a paler, less saturated shine;
+- hue never changes.
+
+The page applies this map with an SVG `feComponentTransfer` filter (server-rendered, no client JS). The result card
+applies the same map pixel by pixel on a canvas. On average, a lock reads within about 2–5 ΔE76 of its target color.
+The textures are versioned (`*-v2.webp`) and cached as immutable. To change them, edit the script, bump the version in
+the script and in [texture.ts](src/lib/hair/texture.ts), then run `node scripts/hair-photo.mjs --preview sheet.png`.
 
 ## Security and privacy
 
@@ -217,16 +255,18 @@ low for a public demo.
 |---|---|
 | `npm run dev` | Development server |
 | `npm run build` / `npm start` | Production build and server |
-| `npm test` | Vitest suite (182 tests) |
+| `npm test` | Vitest suite (208 tests) |
 | `npm run typecheck` | TypeScript, no emit |
 | `npm run lint` | ESLint |
 | `npm run db:generate` / `npm run db:migrate` | Create / apply Drizzle migrations |
 
-The tests cover the engine (every rule, shade decoding, candidates in noisy text, routes, plans, safety), the worked
-examples (each one must show what its lesson says), color math, photo validation and encryption, SSRF guards and page
-extraction, Google claim validation, and integration tests that run the real migrations on in-memory libSQL: email and
-Google accounts, account linking, profiles, checks from all four sources, per-user isolation, encrypted photo storage
-with crypto-shredding, and account deletion.
+The tests cover the engine (every rule, shade decoding, candidates in noisy text, routes, plans, safety, the
+plain-language difference summary), the worked examples (each one must show what its lesson says), color math, the
+hair swatch color ramp and layers, photo
+validation and encryption, YouCam unit budgets, SSRF guards and page extraction, Google claim validation, and
+integration tests that run the real migrations on in-memory libSQL: email and Google accounts, account linking,
+profiles, checks from all four sources, per-user isolation, encrypted photo storage with crypto-shredding, and account
+deletion.
 
 ## Deploy for free
 
@@ -253,3 +293,6 @@ with crypto-shredding, and account deletion.
 ## License
 
 [MIT](LICENSE)
+
+Hair swatch textures are derived from [“Hair01.JPG”](https://commons.wikimedia.org/wiki/File:Hair01.JPG) by Kefi,
+released into the public domain on Wikimedia Commons.

@@ -1,8 +1,13 @@
+import { Camera, MoveHorizontal } from "lucide-react";
 import { SwatchCard } from "@/components/swatch-card";
 import { HairSwatch } from "@/components/hair-swatch";
 import { PhotoPreview } from "@/components/check/photo-preview";
 import { PlanSteps } from "@/components/check/plan-steps";
+import { ChangeList, GapMeter } from "@/components/check/difference";
+import { SaveCardButton } from "@/components/check/save-card";
+import { CompareSlider } from "@/components/ui/compare-slider";
 import { deltaE2000, hexToLab } from "@/lib/color";
+import { describeChange, gapMeaning } from "@/lib/engine/explain";
 import { levelName, roundLevel } from "@/lib/engine/levels";
 import { PRODUCTS } from "@/lib/engine/products";
 import { resultSwatch, todaySwatch } from "@/lib/engine/swatch";
@@ -36,33 +41,68 @@ export function ResultView({ id, input, report, hasStoredSelfie }: {
   const today = todaySwatch(input);
   const likely = resultSwatch(p);
   const goalGap = input.goalHex ? deltaE2000(hexToLab(input.goalHex), hexToLab(p.overallHex)) : null;
+  const meaning = gapMeaning(p.gap);
+  const todayCaption = `Level ${input.lengthsLevel} · ${levelName(input.lengthsLevel)}${today.roots ? ` · roots level ${input.naturalLevel}` : ""}${STREAK_TODAY[today.streaks?.kind ?? "none"]}`;
+  const promiseCaption = `Level ${p.promise.level} · ${p.shade.name}`;
+  const likelyCaption = `${p.twoZone
+    ? `Roots ≈ level ${roundLevel(p.roots.level)}, lengths ≈ level ${roundLevel(p.lengths.level)}`
+    : `About level ${roundLevel(p.lengths.level)} · ${levelName(p.lengths.level)}`}${STREAK_RESULT[likely.streaks?.kind ?? "none"]}`;
+  const saveButton = (className?: string) => (
+    <SaveCardButton
+      checkId={id}
+      className={className}
+      fileName={`dyecast-${p.shade.code.replace(/[^\w.-]+/g, "-")}-reality-check.jpg`}
+      spec={{
+        title: `${HEADLINE[p.verdict]}.`,
+        subtitle: `Box ${p.shade.code} · ${p.shade.name} · ${PRODUCTS[p.product].label}`,
+        zone: meaning.zone,
+        gap: p.gap,
+        gapText: meaning.text,
+        changes: describeChange(p).map((c) => ({ tone: c.tone, title: c.title })),
+      }}
+      panels={[
+        { label: "Today", caption: todayCaption, swatch: { ...today, seed: 2 } },
+        { label: "Box promise", caption: promiseCaption, swatch: { lengths: p.promise.hex, seed: 4 } },
+        { label: "Likely on you", caption: likelyCaption, swatch: { ...likely, seed: 6 }, highlight: true },
+      ]}
+    />
+  );
 
   return (
     <div className="stack result-stack">
-      <section className="result-intro">
-        <div>
+      <section className="result-hero">
+        <div className="result-hero-head">
           <p className="eyebrow">YOUR REALITY CHECK · {SOURCE_LABEL[input.source ?? "code"] ?? "Shade"} · {p.shade.code}</p>
           <h1>{HEADLINE[p.verdict]}.</h1>
           <p className="muted">
             {p.shade.name} · {PRODUCTS[p.product].label}
-            {input.productTitle ? ` · ${input.productTitle}` : ""}
+            {input.productTitle ? ` · ${input.productTitle}` : ""} · certainty {p.confidenceLabel}
           </p>
         </div>
-        <div className="gap-stat">
-          <strong>{p.gap.toFixed(1)}</strong>
-          <span>color gap (ΔE00) · certainty: {p.confidenceLabel}</span>
+        <div className="result-hero-visual">
+          <CompareSlider
+            ratio={0.74}
+            before={<HairSwatch lengths={p.promise.hex} label={`Box promise: ${p.shade.name}`} seed={5} />}
+            after={<HairSwatch {...likely} label={`Your likely result: ${likelyCaption}`} seed={5} />}
+            beforeLabel="Box promise"
+            afterLabel="Likely on you"
+          />
+          <p className="compare-hint"><MoveHorizontal size={15} aria-hidden="true" /> Drag to compare</p>
+        </div>
+        <div className="result-hero-body">
+          <GapMeter gap={p.gap} />
+          <ChangeList prediction={p} />
+          <div className="button-row">
+            {saveButton()}
+            <a href="#see-it-on-you" className="button secondary"><Camera size={16} aria-hidden="true" /> See it on your photo</a>
+          </div>
         </div>
       </section>
 
       <section className="comparison-grid" aria-label="Hair color comparison">
-        <SwatchCard label="Your hair today" {...today} seed={2}
-          description={`Level ${input.lengthsLevel} · ${levelName(input.lengthsLevel)}${today.roots ? ` · roots level ${input.naturalLevel}` : ""}${STREAK_TODAY[today.streaks?.kind ?? "none"]}`} />
-        <SwatchCard label="What the box promises" lengths={p.promise.hex} seed={4}
-          description={`Level ${p.promise.level} · ${p.shade.name}`} />
-        <SwatchCard label="What you'll likely get" {...likely} seed={6} variant="predicted"
-          description={`${p.twoZone
-            ? `Roots ≈ level ${roundLevel(p.roots.level)}, lengths ≈ level ${roundLevel(p.lengths.level)}`
-            : `About level ${roundLevel(p.lengths.level)} · ${levelName(p.lengths.level)}`}${STREAK_RESULT[likely.streaks?.kind ?? "none"]}`} />
+        <SwatchCard label="Your hair today" {...today} seed={2} description={todayCaption} />
+        <SwatchCard label="What the box promises" lengths={p.promise.hex} seed={4} description={promiseCaption} />
+        <SwatchCard label="What you'll likely get" {...likely} seed={6} variant="predicted" description={likelyCaption} />
       </section>
 
       {input.goalHex && goalGap !== null && (
@@ -80,7 +120,8 @@ export function ResultView({ id, input, report, hasStoredSelfie }: {
       )}
 
       <PhotoPreview checkId={id} promiseHex={p.promise.hex} rootsHex={p.roots.hex} lengthsHex={p.lengths.hex}
-        twoZone={p.twoZone} hasStoredSelfie={hasStoredSelfie} muchLighter={p.promise.level - input.lengthsLevel >= 3} />
+        twoZone={p.twoZone} hasStoredSelfie={hasStoredSelfie} muchLighter={p.promise.level - input.lengthsLevel >= 3}
+        saveButton={saveButton("button secondary")} />
 
       <div className="result-columns">
         <section className="panel">

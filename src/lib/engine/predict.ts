@@ -200,7 +200,8 @@ function applyGray(lab: Lab, fraction: number, shade: DecodedShade, product: Pro
   return mixLab(lab, grayStrandLab(shade, product, thickness), fraction);
 }
 
-function warmthDelta(result: Lab, promise: Lab): number {
+/** How much warmer (more orange/red; positive) or cooler (negative) a result looks than the box promise. */
+export function warmthDelta(result: Lab, promise: Lab): number {
   return (result.b - promise.b) * 0.7 + (result.a - promise.a) * 0.5;
 }
 

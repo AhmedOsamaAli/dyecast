@@ -1,30 +1,39 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { Fraunces, Geist } from "next/font/google";
 import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
 
+const display = Fraunces({ subsets: ["latin"], variable: "--font-fraunces", display: "swap" });
+const sans = Geist({ subsets: ["latin"], variable: "--font-geist", display: "swap" });
+
 export const metadata: Metadata = {
   title: { default: "DyeCast - Your color, with context", template: "%s | DyeCast" },
-  description: "Look beyond the hair dye box. Explore your starting shade, color history and an explainable color forecast.",
+  description: "See what a box dye will really do to your hair before it's on your head: the box promise vs. your likely result, with the why and a plan.",
   robots: { index: false, follow: false },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="en"
-    >
+    <html lang="en" className={`${display.variable} ${sans.variable}`}>
       <body>
         <a href="#main-content" className="skip-link">Skip to content</a>
         <SiteHeader />
         <div id="main-content">{children}</div>
         <footer className="site-footer">
-          <span className="wordmark">dye<span>cast</span></span>
-          <p>Know your starting point. Respect your hair.</p>
+          <div className="footer-brand">
+            <span className="wordmark">dye<span>cast</span><i /></span>
+            <p>Know your starting point. Respect your hair.</p>
+          </div>
           <nav aria-label="Footer" className="footer-links">
-            <a href="/examples">Examples</a>
-            <a href="/privacy">Privacy & photos</a>
+            <Link href="/examples">Examples</Link>
+            <Link href="/privacy">Privacy & photos</Link>
+            <Link href="/register">Get started</Link>
           </nav>
-          <span className="small">Powered by YouCam AI · educational forecast, not a guaranteed result</span>
+          <p className="footer-note">
+            Powered by YouCam AI. An educational forecast, not a guaranteed result — always follow your box&apos;s instructions,
+            allergy alert test and strand test.
+          </p>
         </footer>
       </body>
     </html>

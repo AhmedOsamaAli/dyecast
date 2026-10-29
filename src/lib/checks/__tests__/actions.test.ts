@@ -103,7 +103,8 @@ describe("email accounts", () => {
     await expect(login({}, form({ email: "SARA@example.com", password: "my secure password" }))).rejects.toThrow("REDIRECT:/check");
   });
 
-  it("limits unsuccessful login attempts for the same normalized email", async () => {
+  // Unknown emails still pay a full scrypt hash (no timing leak), so ten misses are slow on CI machines.
+  it("limits unsuccessful login attempts for the same normalized email", { timeout: 30_000 }, async () => {
     for (let attempt = 0; attempt < 10; attempt++) {
       expect((await login({}, form({ email: "missing@example.com", password: "wrong" }))).error).toBe("Email or password is incorrect.");
     }

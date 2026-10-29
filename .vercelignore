@@ -3,6 +3,7 @@
 .env*
 !.env.example
 /data/
+/.cache/
 /.next/
 /node_modules/
 /coverage/
