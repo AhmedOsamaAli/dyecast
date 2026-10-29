@@ -5,13 +5,13 @@ import { useEffect, useRef, useState } from "react";
 import { labToHex } from "@/lib/color";
 import { densityFromYouCam, lengthFromYouCam, type DensityClass, type LengthClass } from "@/lib/engine/boxes";
 import { levelName } from "@/lib/engine/levels";
-import { suggestFromHairClass, suggestFromLab } from "@/lib/engine/measure";
+import { classNote, suggestFromHairClass, suggestFromLab } from "@/lib/engine/measure";
 import { todaySwatch } from "@/lib/engine/swatch";
 import type { GrayShare, HairTone } from "@/lib/engine/types";
 import type { Measurement } from "@/lib/checks/validation";
 import { analyzePhoto, ApiError, waitForTask, type TermResults, type ToneResults } from "@/lib/client/api";
-import { blobToCanvas, prepareImage } from "@/lib/client/image";
-import { hasHair, measureHair, segmentHair } from "@/lib/client/hair-vision";
+import { prepareImage } from "@/lib/client/image";
+import { readPhoto, type PhotoReading } from "@/lib/client/hair-vision";
 import { checkPhotoLighting, type LightingAdvice } from "@/lib/client/lighting";
 import { putLocal, SELFIE_KEY } from "@/lib/client/local-store";
 import { TONE_LABELS } from "@/components/form-controls";
@@ -32,6 +32,10 @@ export interface PhotoSuggestions {
   length?: LengthClass;
   density?: DensityClass;
   gray?: GrayShare;
+  /** How YouCam's quick hair class compares with the color measured on this device. */
+  classVerdict?: "agrees" | "differs";
+  /** Plain words when they differ. */
+  classNote?: string;
   measurement: Measurement;
 }
 
@@ -49,8 +53,10 @@ export function PhotoAssist({ mockMode, storePhotos, onApply }: {
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
   const [result, setResult] = useState<PhotoSuggestions | null>(null);
-  const [lighting, setLighting] = useState<LightingAdvice | null>(null);
+  const [lighting, setLighting] = useState<LightingAdvice | "checking" | null>(null);
   const urls = useRef<string[]>([]);
+  // The on-device reading of the current selfie, started as soon as it's chosen.
+  const reading = useRef<{ blob: Blob; result: Promise<PhotoReading | null> } | null>(null);
 
   useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), []);
 
@@ -63,7 +69,12 @@ export function PhotoAssist({ mockMode, storePhotos, onApply }: {
         setPhoto({ blob: prepared.blob, url: prepared.url });
         setResult(null);
         setStatus("idle");
-        setLighting(await checkPhotoLighting(prepared.blob).catch(() => null));
+        setLighting("checking");
+        const current = { blob: prepared.blob, result: readPhoto(prepared.blob) };
+        reading.current = current;
+        const seen = await current.result;
+        const advice = await checkPhotoLighting(prepared.blob, seen?.skin).catch(() => null);
+        if (reading.current === current) setLighting(advice);
       } else {
         setDensityPhoto({ blob: prepared.blob, url: prepared.url });
       }
@@ -78,16 +89,8 @@ export function PhotoAssist({ mockMode, storePhotos, onApply }: {
     setError("");
     try {
       setProgress("Finding your hair on this device…");
-      const local = (async () => {
-        try {
-          const canvas = await blobToCanvas(photo.blob);
-          const mask = await segmentHair(canvas);
-          if (!hasHair(mask)) return null;
-          return measureHair(canvas, mask);
-        } catch {
-          return null;
-        }
-      })();
+      const onDevice = reading.current?.blob === photo.blob ? reading.current.result : readPhoto(photo.blob);
+      const local = onDevice.then((r) => r?.hair ?? null);
 
       setProgress("Analyzing with YouCam AI…");
       const started = await analyzePhoto(photo.blob, densityPhoto?.blob);
@@ -101,10 +104,13 @@ export function PhotoAssist({ mockMode, storePhotos, onApply }: {
 
       const hairClass = tone.status === "success" ? tone.results?.hairColorName : undefined;
       const level = measured ? suggestFromLab(measured.lab, hairClass, measured) : hairClass ? suggestFromHairClass(hairClass) : null;
+      const note = measured && level ? classNote(hairClass, level) : undefined;
       const suggestions: PhotoSuggestions = {
         level: level?.level,
         tone: level?.tone,
         gray: level?.suggestGray,
+        classVerdict: measured && hairClass ? (note ? "differs" : "agrees") : undefined,
+        classNote: note,
         length: length.status === "success" ? lengthFromYouCam(length.results?.term) : undefined,
         density: density?.status === "success" ? densityFromYouCam(density.results?.term) : undefined,
         measurement: {
@@ -171,7 +177,13 @@ export function PhotoAssist({ mockMode, storePhotos, onApply }: {
         />
       </div>
 
-      {lighting && (
+      {lighting === "checking" && (
+        <p className="lighting-check checking" role="status">
+          <Sun size={16} aria-hidden="true" />
+          <span>Checking the light on this device…</span>
+        </p>
+      )}
+      {lighting && lighting !== "checking" && (
         <p className={`lighting-check ${lighting.ok ? "good" : "warn"}`} role="status">
           {lighting.ok ? <Sun size={16} aria-hidden="true" /> : <TriangleAlert size={16} aria-hidden="true" />}
           <span>{lighting.ok ? "Good light for true color." : lighting.issues[0].text}</span>
@@ -213,10 +225,16 @@ export function PhotoAssist({ mockMode, storePhotos, onApply }: {
               </div>
             </div>
           )}
+          {result.classNote && <p className="class-note small">{result.classNote}</p>}
           <dl>
             {result.length && <div><dt>Length</dt><dd>{LENGTH_LABELS[result.length]}</dd></div>}
             {result.density && <div><dt>Density</dt><dd>{DENSITY_LABELS[result.density]}</dd></div>}
-            {result.measurement.youcamHairClass && <div><dt>YouCam hair color</dt><dd>{result.measurement.youcamHairClass}</dd></div>}
+            {result.measurement.youcamHairClass && (
+              <div>
+                <dt>YouCam&apos;s quick check</dt>
+                <dd>{result.measurement.youcamHairClass}{result.classVerdict ? ` · ${result.classVerdict}` : ""}</dd>
+              </div>
+            )}
           </dl>
           {(result.measurement.measuredHex || result.measurement.youcamHairHex) && (
             <details className="camera-saw">

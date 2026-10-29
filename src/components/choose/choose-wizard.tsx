@@ -6,6 +6,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { rankGoals, type ChoosePrefs, type ColorPick, type GoalReach, type Undertone } from "@/lib/engine/recommend";
 import type { GrayShare } from "@/lib/engine/types";
 import { HairSwatch } from "@/components/hair-swatch";
+import { BOX_SOURCES_NOTE, BoxList } from "@/components/box-list";
 import { ComparePreview } from "@/components/choose/compare-preview";
 
 interface Option<T extends string> {
@@ -65,6 +66,7 @@ function Question<T extends string>({ title, name, options, value, onChange, not
 
 function PickCard({ pick, rank, seed }: { pick: ColorPick; rank: string; seed: number }) {
   const colorist = pick.route === "colorist";
+  const boxes = pick.steps.find((s) => s.role === "color")?.boxes ?? [];
   return (
     <article className={`pick-card ${colorist ? "colorist" : ""}`}>
       <div className="pick-visual color-surface">
@@ -84,6 +86,7 @@ function PickCard({ pick, rank, seed }: { pick: ColorPick; rank: string; seed: n
           {pick.reasons.map((r) => <li key={r} className="good"><Check size={15} aria-hidden="true" /> {r}</li>)}
           {pick.cautions.map((c) => <li key={c} className="warn"><CircleAlert size={15} aria-hidden="true" /> {c}</li>)}
         </ul>
+        {boxes.length > 0 && <BoxList boxes={boxes} title={pick.route === "box-and-toner" ? "Boxes to look for (then a toner)" : "Boxes to look for"} />}
         <Link href={`/check?mode=goal&goal=${pick.goal.id}`} className="button">
           Check it on my hair <ArrowRight size={16} aria-hidden="true" />
         </Link>
@@ -132,6 +135,7 @@ export function ChooseWizard({ reach, gray, skin }: {
         <div className="pick-grid">
           {top.map((pick, i) => <PickCard key={pick.goal.id} pick={pick} rank={RANK[i]} seed={i * 2 + 1} />)}
         </div>
+        {top.some((pick) => pick.steps.some((s) => s.boxes?.length)) && <p className="small muted box-sources">{BOX_SOURCES_NOTE}</p>}
 
         <ComparePreview picks={top} />
 

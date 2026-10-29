@@ -3,7 +3,7 @@ import { naturalLab } from "../levels";
 import { hexToLab } from "@/lib/color";
 import { boxesNeeded, densityFromYouCam, lengthFromYouCam } from "../boxes";
 import { findPaths } from "../get-there";
-import { CAMERA_L_OFFSET, readHair, robustHairLab, suggestFromHairClass, suggestFromLab } from "../measure";
+import { CAMERA_L_OFFSET, classNote, readHair, robustHairLab, suggestFromHairClass, suggestFromLab } from "../measure";
 import { decodeShade } from "../shade-code";
 import { shadeIdealLab, describedHairLab } from "../predict";
 import type { HairProfileInput } from "../types";
@@ -70,14 +70,52 @@ describe("measurement suggestions", () => {
     expect(robustHairLab(pixels)).toEqual({ L: 30, a: 6, b: 12 });
   });
 
-  it("suggests a level from measured color and respects the YouCam class", () => {
+  it("lets the measured color decide, with YouCam's class as a second opinion", () => {
     const lab = naturalLab(4);
     const measured = { ...lab, L: lab.L - CAMERA_L_OFFSET };
-    expect(suggestFromLab(measured).level).toBe(4);
-    const constrained = suggestFromLab(measured, "Blonde");
-    expect(constrained.level).toBe(6);
-    expect(constrained.adjustedByClass).toBe(true);
-    expect(constrained.confidence).toBeLessThan(suggestFromLab(measured).confidence);
+    const alone = suggestFromLab(measured);
+    expect(alone.level).toBe(4);
+    const agrees = suggestFromLab(measured, "Brown");
+    expect(agrees.level).toBe(4);
+    expect(agrees.classDisagrees).toBe(false);
+    expect(agrees.confidence).toBeGreaterThan(alone.confidence);
+    expect(classNote("Brown", agrees)).toBeUndefined();
+    const differs = suggestFromLab(measured, "Blonde");
+    expect(differs.level).toBe(4);
+    expect(differs.classDisagrees).toBe(true);
+    expect(differs.confidence).toBeLessThan(alone.confidence);
+    expect(classNote("Blonde", differs)).toMatch(/reads darker/);
+  });
+
+  it("keeps light hair light when YouCam's class says Black", () => {
+    // Measured on this device from public-domain NASA portraits (light-medium brown, light brown and dark blonde hair)
+    // whose YouCam class came back "Black" in a live test.
+    const portraits = [
+      [{ L: 23.7, a: 4.7, b: 10.3 }, 4],
+      [{ L: 30.2, a: 6.2, b: 17.8 }, 4.5],
+      [{ L: 37.4, a: 4.7, b: 16.8 }, 5.5],
+    ] as const;
+    for (const [lab, level] of portraits) {
+      const s = suggestFromLab(lab, "Black");
+      expect(s.level).toBe(level);
+      expect(s.classDisagrees).toBe(true);
+      expect(classNote("Black", s)).toMatch(/reads lighter/);
+    }
+  });
+
+  it("needs gray in the strands before believing a Grey/White class", () => {
+    // Live test: dark hair with no light, colorless strands, while YouCam's class said "Grey/White".
+    const dark = readHair(Array.from({ length: 200 }, (_, i) => ({ L: 4 + (i % 16), a: 2.5, b: 1.7 })))!;
+    const s = suggestFromLab(dark.lab, "Grey/White", dark);
+    expect(s.suggestGray).toBeUndefined();
+    expect(s.level).toBeLessThanOrEqual(2);
+    expect(classNote("Grey/White", s)).toMatch(/set Gray share yourself/);
+    // With a few light, colorless strands, the class counts: a little gray.
+    const few = readHair([
+      ...Array.from({ length: 180 }, () => ({ L: 15, a: 2, b: 2 })),
+      ...Array.from({ length: 20 }, () => ({ L: 70, a: 0, b: 2 })),
+    ])!;
+    expect(suggestFromLab(few.lab, "Grey/White", few).suggestGray).toBe("some");
   });
 
   it("falls back to the class midpoint", () => {
@@ -141,7 +179,11 @@ describe("measurement suggestions", () => {
     expect(s.suggestGray).toBe("some");
     expect(s.level).toBe(3);
     expect(suggestFromLab(reading.lab, "Grey/White", reading).suggestGray).toBe("half");
-    // When YouCam saw a hair color, partial gray is left for the person to set.
-    expect(suggestFromLab(reading.lab, "Black", reading).suggestGray).toBeUndefined();
+    // When YouCam saw a hair color, partial gray is left for the person to set, but the level still comes from the
+    // pigmented strands.
+    const named = suggestFromLab(reading.lab, "Black", reading);
+    expect(named.suggestGray).toBeUndefined();
+    expect(named.level).toBe(3);
+    expect(named.tone).not.toBe("cool");
   });
 });

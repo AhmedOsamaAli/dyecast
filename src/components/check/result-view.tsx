@@ -10,9 +10,11 @@ import { deltaE2000, hexToLab } from "@/lib/color";
 import { describeChange, gapMeaning } from "@/lib/engine/explain";
 import { levelName, roundLevel } from "@/lib/engine/levels";
 import { PRODUCTS } from "@/lib/engine/products";
+import { boxesFor } from "@/lib/engine/retail";
 import { resultSwatch, todaySwatch } from "@/lib/engine/swatch";
 import { planFor, type CheckReport } from "@/lib/checks/report";
 import type { StudioInput } from "@/lib/checks/validation";
+import { BOX_SOURCES_NOTE, BoxList } from "@/components/box-list";
 
 const HEADLINE = {
   close: "Close to the box",
@@ -165,11 +167,12 @@ export function ResultView({ id, input, report, hasStoredSelfie }: {
                         <strong>{option.steps.map((step) => `${step.shade.code}${step.role === "toner" ? " toner" : ""}`).join(" + ")}</strong>
                         <span className="small muted">{option.steps[0].shade.name} · {PRODUCTS[option.steps[0].shade.product].label}</span>
                         <span className="small">{option.distance < 6 ? "Very close" : option.distance < 12 ? "Close-ish" : "Still far"} (ΔE {option.distance.toFixed(1)})</span>
+                        <BoxList compact boxes={boxesFor(option.steps[0].shade, 3)} title="On the shelf" />
                       </div>
                     </li>
                   ))}
                 </ul>
-                <p className="small muted">Generic shade references by level and tone — match the code on any brand&apos;s box.</p>
+                <p className="small muted">Codes are generic (level and tone), so any brand&apos;s box with the same level and tone works. {BOX_SOURCES_NOTE}</p>
               </>
             )}
           </section>

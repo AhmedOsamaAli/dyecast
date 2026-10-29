@@ -24,12 +24,16 @@ Built for the **YouCam API Skin AI & eCommerce VTO Hackathon**.
    thickness, length and density. Optionally, a selfie and a hairline photo *suggest* values (on-device hair
    measurement + YouCam analysis). Take them with your phone's camera or your computer's webcam, or upload them. You
    confirm every value; the forecast uses your choices, not raw pixels. A lighting check tells you when yellow indoor
-   light, a dark room or harsh light would skew the color.
+   light, a dark room or harsh light would skew the color. It judges the light from the brightest parts of the photo
+   and the face's skin hue, which sits in the same range for every skin tone, so dark backgrounds and deep skin tones
+   are never flagged as "too dark" or "yellow".
 2. **Not sure yet? Help me choose.** Three quick questions (how big a change, how much upkeep, your skin's undertone,
    suggested from your selfie's skin color or a gold-vs-silver jewelry question). DyeCast works every goal color out
    on *your* hair and ranks your best fits with reasons and cautions: one box or box + toner (or a colorist), how soon
-   roots show, fading reds, cool blondes that need toning. Compare the top picks side by side on your own selfie,
-   recolored on your device.
+   roots show, fading reds, cool blondes that need toning. Each pick lists **real boxes to look for**, matched from 209
+   shades across 16 product lines (Clairol, Garnier, L'Oréal Paris, Revlon, Schwarzkopf, Wella) that were each checked
+   on the brand's or a retailer's site. Compare the top picks side by side on your own selfie, recolored on your
+   device.
 3. **Choose what you're aiming for — four ways:**
    - **My goal** — pick one of 16 goal colors, or match the hair in an inspiration photo (measured on your device).
      DyeCast searches box routes (shade, plus a toner when it helps) from *your* hair and shows how close each lands.
@@ -69,7 +73,7 @@ with the same engine.
 | YouCam API | Feature | How DyeCast uses it | Units |
 |---|---|---|---|
 | File API | `POST /s2s/v2.0/file` | Upload a cleaned selfie (presigned PUT) | — |
-| AI Facial Color Tones | `skin-tone-analysis` | Hair color class and hex → suggested level and tone | 20 |
+| AI Facial Color Tones | `skin-tone-analysis` | Hair color class (second opinion on the measured level and tone) and skin color (undertone for Help me choose) | 20 |
 | AI Hair Length Detection | `hair-length-detection` | Suggested length → box count | 2 |
 | AI Hair Density Detection | `hair-density-detection` | Optional hairline photo → density → box count | 1 |
 | AI Hair Color (try-on) | `hair-color` | Render the box promise and the predicted result (`full`, or `ombre` for roots vs. lengths) | 1 per render |
@@ -154,8 +158,13 @@ swatch colors (roots, highlight and gray strands), and [shade-code.ts](src/lib/e
 finds them in noisy OCR or page text (ignoring quantities such as `1.7 fl oz`, even when OCR reads it as `floz`).
 [recommend.ts](src/lib/engine/recommend.ts) powers Help me choose: it works every goal color out on the person's hair
 once (on the server), then ranks the results for each set of answers (in the browser) with plain reasons and cautions.
-[measure.ts](src/lib/engine/measure.ts) turns a photo's hair pixels into suggestions: gray is suggested only when
-YouCam's class says Grey/White or the strands show real salt and pepper, because photos make dark hair look dull.
+[retail.ts](src/lib/engine/retail.ts) matches each route step to real boxes from
+[retail-boxes.ts](src/data/retail-boxes.ts) (same level and product type; exact tone first, then the same tone family;
+spread across brands). Matching runs on the server, so only the matches reach the browser.
+[measure.ts](src/lib/engine/measure.ts) turns a photo's hair pixels into suggestions. The color measured on the device
+decides the level; YouCam's quick hair class is a second opinion that raises or lowers confidence and is explained in
+plain words when it differs (in testing it called light brown and dark blonde hair "Black"). Gray is suggested only
+when the strands show it, because photos make dark hair look dull.
 Server actions recompute every report from validated input; the browser's forecast is a preview, never trusted.
 
 ### Hair swatches
@@ -268,14 +277,14 @@ low for a public demo.
 |---|---|
 | `npm run dev` | Development server |
 | `npm run build` / `npm start` | Production build and server |
-| `npm test` | Vitest suite (230 tests) |
+| `npm test` | Vitest suite (239 tests) |
 | `npm run typecheck` | TypeScript, no emit |
 | `npm run lint` | ESLint |
 | `npm run db:generate` / `npm run db:migrate` | Create / apply Drizzle migrations |
 
 The tests cover the engine (every rule, shade decoding, candidates in noisy text, routes, plans, safety, the
-plain-language difference summary), the worked examples (each one must show what its lesson says), color math, the
-hair swatch color ramp and layers, photo
+plain-language difference summary, box matching), the worked examples (each one must show what its lesson says), color
+math, the hair swatch color ramp and layers, the photo light check across skin tones, photo
 validation and encryption, YouCam unit budgets, SSRF guards and page extraction, Google claim validation, and
 integration tests that run the real migrations on in-memory libSQL: email and Google accounts, account linking,
 profiles, checks from all four sources, per-user isolation, encrypted photo storage with crypto-shredding, and account
@@ -292,10 +301,11 @@ deletion.
 ## Honest limitations
 
 - DyeCast is a rule-based forecast from general hair-color chemistry, not a per-brand formula model, and it makes no
-  measured accuracy claim yet. Shades are generic references by level and tone; brands vary.
-- Photos read hair darker or lighter depending on light, which is why photo values are only suggestions. YouCam's hair
-  color class can also misread warm light (it called very dark brown hair "Auburn" in testing), so a red class only
-  counts when the on-device measurement agrees.
+  measured accuracy claim yet. Route codes are generic references by level and tone; the real boxes listed with them
+  match by level and tone, and brands vary. Shade ranges change, so the box in hand wins.
+- Photos read hair darker or lighter depending on light, which is why photo values are only suggestions. YouCam's quick
+  hair color class is often off (it called very dark brown hair "Auburn" and light brown hair "Black" in testing), so
+  it never overrides the on-device measurement, and a red class only counts when the measurement shows warmth too.
 - Photo try-ons keep very dark hair's natural depth: on near-black hair even YouCam's "Platinum Blonde" preset renders
   as a dark olive. Much lighter boxes therefore look darker in the photo than on the box; the swatches show true colors.
 - Email/password accounts don't have email verification or password reset yet; Google sign-in covers verified

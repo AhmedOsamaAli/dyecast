@@ -2,13 +2,15 @@
 
 import type { ImageSegmenter } from "@mediapipe/tasks-vision";
 import { hexToLab, type Lab } from "@/lib/color";
-import { readHair, type HairReading } from "@/lib/engine/measure";
+import { readHair, robustHairLab, type HairReading } from "@/lib/engine/measure";
+import { blobToCanvas } from "@/lib/client/image";
 
 const WASM_BASE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.1/wasm";
 const MODEL_URL =
   "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite";
 /** selfie_multiclass labels: 0 background, 1 hair, 2 body skin, 3 face skin, 4 clothes, 5 other. */
 const HAIR = 1;
+const FACE_SKIN = 3;
 
 let segmenter: Promise<ImageSegmenter> | null = null;
 
@@ -36,6 +38,8 @@ export interface HairMask {
   alpha: Float32Array;
   /** Pixels that are confidently hair (confidence > 0.5). */
   pixels: number;
+  /** Per-pixel face-skin confidence 0–1. */
+  face?: Float32Array;
 }
 
 /** Confident hair pixels needed to measure or recolor: about a 50×50 px patch, so short hair still counts. */
@@ -55,7 +59,9 @@ export async function segmentHair(canvas: HTMLCanvasElement): Promise<HairMask |
     const alpha = new Float32Array(mask.getAsFloat32Array());
     let hair = 0;
     for (let i = 0; i < alpha.length; i++) if (alpha[i] > 0.5) hair++;
-    return { width: mask.width, height: mask.height, alpha, pixels: hair };
+    const faceMask = result.confidenceMasks?.[FACE_SKIN];
+    const face = faceMask ? new Float32Array(faceMask.getAsFloat32Array()) : undefined;
+    return { width: mask.width, height: mask.height, alpha, pixels: hair, face };
   } finally {
     result.close();
   }
@@ -97,10 +103,10 @@ function labPixel(L: number, a: number, b: number, data: Uint8ClampedArray, i: n
   data[i + 2] += (bl - data[i + 2]) * mix;
 }
 
-/** Hair color from the confidently-hair pixels of a photo: the robust typical color plus gray-strand evidence. */
-export function measureHair(canvas: HTMLCanvasElement, mask: HairMask): HairReading | null {
+/** Lab samples (about 60,000 across the photo) where a mask is confident. */
+function sampleWhere(canvas: HTMLCanvasElement, weights: Float32Array, min: number): Lab[] {
   const ctx = canvas.getContext("2d");
-  if (!ctx || mask.width !== canvas.width || mask.height !== canvas.height) return null;
+  if (!ctx || weights.length !== canvas.width * canvas.height) return [];
   const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const lab = new Float32Array(3);
   const samples: Lab[] = [];
@@ -108,12 +114,42 @@ export function measureHair(canvas: HTMLCanvasElement, mask: HairMask): HairRead
   for (let y = 0; y < canvas.height; y += step) {
     for (let x = 0; x < canvas.width; x += step) {
       const p = y * canvas.width + x;
-      if (mask.alpha[p] < 0.85) continue;
+      if (weights[p] < min) continue;
       pixelLab(data[p * 4], data[p * 4 + 1], data[p * 4 + 2], lab);
       samples.push({ L: lab[0], a: lab[1], b: lab[2] });
     }
   }
-  return readHair(samples);
+  return samples;
+}
+
+/** Hair color from the confidently-hair pixels of a photo: the robust typical color plus gray-strand evidence. */
+export function measureHair(canvas: HTMLCanvasElement, mask: HairMask): HairReading | null {
+  if (mask.width !== canvas.width || mask.height !== canvas.height) return null;
+  return readHair(sampleWhere(canvas, mask.alpha, 0.85));
+}
+
+/** Typical face-skin color, used to tell colored light from colorful surroundings. Null when no face was found. */
+export function measureSkin(canvas: HTMLCanvasElement, mask: HairMask): Lab | null {
+  if (!mask.face || mask.width !== canvas.width || mask.height !== canvas.height) return null;
+  return robustHairLab(sampleWhere(canvas, mask.face, 0.85));
+}
+
+export interface PhotoReading {
+  /** Null when too little hair shows. */
+  hair: HairReading | null;
+  skin: Lab | null;
+}
+
+/** Everything DyeCast reads from a photo on this device. Null when the on-device model can't run. */
+export async function readPhoto(photo: Blob): Promise<PhotoReading | null> {
+  try {
+    const canvas = await blobToCanvas(photo);
+    const mask = await segmentHair(canvas);
+    if (!mask) return null;
+    return { hair: hasHair(mask) ? measureHair(canvas, mask) : null, skin: measureSkin(canvas, mask) };
+  } catch {
+    return null;
+  }
 }
 
 export interface RecolorTarget {

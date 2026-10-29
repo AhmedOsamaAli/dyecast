@@ -3,6 +3,7 @@ import { GOAL_COLORS, type GoalColor } from "@/data/goals";
 import { findPaths } from "./get-there";
 import { levelFromLightness } from "./levels";
 import { describedHairLab, GAP_CLOSE } from "./predict";
+import type { BoxMatch } from "./retail";
 import type { HairProfileInput, ProductType, ShadeTones } from "./types";
 
 /**
@@ -31,6 +32,8 @@ export interface RouteStep {
   level: number;
   tones: ShadeTones;
   product: ProductType;
+  /** Real boxes that fit this step (attached on the server, see retail.ts). */
+  boxes?: BoxMatch[];
 }
 
 /** How a goal color works out on this person's hair, before any preferences. */

@@ -293,6 +293,8 @@ details summary { cursor: pointer; }
 .lighting-check svg { flex-shrink: 0; margin-top: 2px; }
 .lighting-check.good { background: #f1f7ee; color: #36572f; }
 .lighting-check.warn { background: #fdf3e2; color: #7a4d0b; }
+.lighting-check.checking { background: #f5f0e8; color: var(--muted); }
+.class-note { margin: 0; padding: 9px 12px; border-left: 3px solid #c9a46a; border-radius: 0 10px 10px 0; background: #fbf7f0; color: #5e4a2c; line-height: 1.45; }
 .suggestion-hero { display: flex; gap: 14px; align-items: center; padding: 12px; border-radius: 12px; background: #f5f0e8; }
 .suggestion-hero > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .suggestion-hero strong { font-size: 1rem; }
@@ -358,6 +360,19 @@ details summary { cursor: pointer; }
 .pick-points svg { flex-shrink: 0; margin-top: 2px; }
 .pick-points .good svg { color: var(--good); }
 .pick-points .warn svg { color: var(--warn); }
+.box-list { display: grid; gap: 7px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--background); }
+.box-list-title { margin: 0; color: var(--muted); font-size: .7rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+.box-list ul { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.box-list li { display: grid; gap: 1px; min-width: 0; }
+.box-list a { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0 5px; color: var(--foreground); font-size: .82rem; line-height: 1.35; text-decoration: none; }
+.box-list a:hover strong, .box-list a:focus-visible strong { color: var(--accent); text-decoration: underline; }
+.box-list a span { color: var(--muted); }
+.box-list a svg { flex-shrink: 0; align-self: center; color: var(--muted); }
+.box-list small { color: var(--muted); font-size: .72rem; line-height: 1.35; }
+.box-list.compact { margin-top: 8px; padding: 8px 10px; }
+.path-list .box-list li { display: grid; padding: 0; border: 0; }
+.path-list .box-list span { display: inline; }
+.box-sources { margin: 14px 0 0; }
 .pick-body > .button { margin-top: auto; }
 .compare-invite { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 18px 0 0; padding: 12px 14px; border: 1px dashed var(--border-strong); border-radius: 12px; font-size: .85rem; }
 .compare-invite a { color: var(--accent); font-weight: 600; }
