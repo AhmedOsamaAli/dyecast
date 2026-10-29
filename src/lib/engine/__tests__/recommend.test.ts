@@ -40,6 +40,24 @@ describe("reachGoals", () => {
     expect(platinum.route).toBe("colorist");
     expect(platinum.regrowth).toBeGreaterThan(5);
   });
+
+  it("explains when lifting brings out the hair's own warmth, so a box of another tone lands closest", () => {
+    const nearBlack = reachGoals(hair(1.5));
+    for (const r of [...nearBlack, ...lightBrownReach, ...darkReach, ...reachGoals(hair(5))]) {
+      if (!r.ownWarmth) continue;
+      const box = r.steps.find((s) => s.role === "color")!;
+      expect(["gold", "copper", "red", "mahogany", "warm"]).toContain(r.goal.tones.primary);
+      expect(["gold", "copper", "red", "mahogany", "warm"]).not.toContain(box.tones.primary);
+      expect(r.ownWarmth).toMatch(new RegExp(`an? ${box.tones.primary} box lands closest`));
+    }
+    const mahogany = nearBlack.find((r) => r.goal.name === "Mahogany")!;
+    expect(mahogany.steps[0].tones.primary).toBe("natural");
+    expect(mahogany.ownWarmth).toMatch(/brings out its own .*red.* warmth, so a natural box/);
+    const picks = pick({ boldness: "noticeable", upkeep: "medium", undertone: "neutral" }, nearBlack, hair(1.5));
+    expect(picks.find((p) => p.goal.name === "Mahogany")?.reasons).toContain(mahogany.ownWarmth);
+    // Dyed hair doesn't lift that way, so there's no such note.
+    expect(reachGoals(hair(1.5, { history: "dyed" })).some((r) => r.ownWarmth)).toBe(false);
+  });
 });
 
 describe("rankGoals", () => {

@@ -1,10 +1,10 @@
 import { deltaE2000, hexToLab, labToLch } from "@/lib/color";
 import { GOAL_COLORS, type GoalColor } from "@/data/goals";
 import { findPaths } from "./get-there";
-import { levelFromLightness } from "./levels";
+import { levelFromLightness, UNDERLYING_NAMES } from "./levels";
 import { describedHairLab, GAP_CLOSE } from "./predict";
 import type { BoxMatch } from "./retail";
-import type { HairProfileInput, ProductType, ShadeTones } from "./types";
+import type { HairProfileInput, ProductType, ShadeTones, ToneId } from "./types";
 
 /**
  * "Help me choose": which goal colors fit this person. Each goal is first worked out on their hair (the same route
@@ -52,6 +52,8 @@ export interface GoalReach {
   regrowth: number;
   /** Why it takes a colorist, when it does. */
   colorist?: string;
+  /** Why a box of another tone lands closest, when lifting never-colored hair brings out its own warmth. */
+  ownWarmth?: string;
 }
 
 export interface ColorPick extends GoalReach {
@@ -102,8 +104,23 @@ export function reachGoals(profile: HairProfileInput, goals: GoalColor[] = GOAL_
       change: deltaE2000(today, likely),
       regrowth: Math.abs(levelFromLightness(likely.L) - profile.naturalLevel),
       colorist: result.professionalReason,
+      ownWarmth: ownWarmth(profile, goal, option?.steps.find((s) => s.role === "color")?.shade),
     };
   });
+}
+
+const WARM_GOAL_TONES = new Set<ToneId>(["gold", "copper", "red", "mahogany", "warm"]);
+
+/**
+ * Lightening never-colored hair exposes its warm underlying pigment, so a natural or ash box can land closest to a warm
+ * goal. Says so, so a "Mahogany" pick with a natural brown box doesn't look like a mistake.
+ */
+function ownWarmth(profile: HairProfileInput, goal: GoalColor, box: { level: number; tones: ShadeTones } | undefined): string | undefined {
+  if (!box || profile.history !== "virgin" || box.level < profile.naturalLevel + 1) return undefined;
+  if (!WARM_GOAL_TONES.has(goal.tones.primary) || WARM_GOAL_TONES.has(box.tones.primary)) return undefined;
+  const pigment = UNDERLYING_NAMES[Math.round(Math.min(10, Math.max(1, box.level)))];
+  const tone = box.tones.primary;
+  return `Lifting your hair brings out its own ${pigment} warmth, so ${/^[aeiou]/.test(tone) ? "an" : "a"} ${tone} box lands closest`;
 }
 
 /** How much visible change each answer asks for (CIEDE2000 from today's hair). */
@@ -126,6 +143,7 @@ export function rankGoals(reach: GoalReach[], profile: Pick<HairProfileInput, "g
         cautions.push(r.colorist ?? "From your hair, this takes a colorist.");
       } else {
         reasons.push(r.route === "one-box" ? "One box gets you there on your hair" : "A box plus a toner gets you there");
+        if (r.ownWarmth) reasons.push(r.ownWarmth);
         if (r.route === "box-and-toner") score += 1;
         if (r.distance > GAP_CLOSE) {
           score += (r.distance - GAP_CLOSE) * 0.5;
