@@ -70,13 +70,16 @@ export function PasswordForm({ hasPassword }: { hasPassword: boolean }) {
 
 export function PrivacyActions({ hasStoredPhoto }: { hasStoredPhoto: boolean }) {
   const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   async function run(task: () => Promise<string>) {
     setBusy(true);
+    setFailed(false);
     try {
       setMessage(await task());
-    } catch {
-      setMessage("Something went wrong. Please try again.");
+    } catch (error) {
+      setFailed(true);
+      setMessage(error instanceof Error ? error.message : "Something went wrong. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -89,21 +92,45 @@ export function PrivacyActions({ hasStoredPhoto }: { hasStoredPhoto: boolean }) 
           Clear photos on this device
         </button>
         <button type="button" className="button secondary" disabled={busy || !hasStoredPhoto}
-          onClick={() => run(async () => (await forgetPhotos()).message ?? "Deleted.")}>
+          onClick={() => run(async () => {
+            const result = await forgetPhotos();
+            if (result.error) throw new Error(result.error);
+            return result.message ?? "Stored photos deleted.";
+          })}>
           Delete photos in my account
         </button>
         <a className="button secondary" href="/api/account/export">Download my data (JSON)</a>
       </div>
-      {message && <p role="status" className="notice success small">{message}</p>}
+      {message && <p role={failed ? "alert" : "status"} className={`notice ${failed ? "danger" : "success"} small`}>{message}</p>}
     </div>
   );
 }
 
 export function DangerZone() {
-  const [state, action, pending] = useActionState<SettingsState, FormData>(deleteAccount, {});
+  // Photos and previews on this device go first, so nothing is left behind for the next person on this browser.
+  const [state, action, pending] = useActionState<SettingsState, FormData>(async (previous, form) => {
+    if (String(form.get("confirm") ?? "").trim().toUpperCase() === "DELETE") {
+      try {
+        await clearLocal();
+      } catch {
+        return { error: "Saved photos could not be cleared. Clear this site's browser data, then try deleting the account again." };
+      }
+    }
+    return deleteAccount(previous, form);
+  }, {});
+  async function everywhere() {
+    let cleanupFailed = false;
+    try {
+      await clearLocal();
+    } catch {
+      console.error("Device photos could not be cleared before sign-out.");
+      cleanupFailed = true;
+    }
+    await signOutEverywhere(cleanupFailed);
+  }
   return (
     <div className="stack">
-      <form action={signOutEverywhere}>
+      <form action={everywhere}>
         <button className="button secondary">Sign out on every device</button>
       </form>
       <form action={action} className="stack">
@@ -112,6 +139,7 @@ export function DangerZone() {
           <input id="confirm" name="confirm" autoComplete="off" aria-invalid={Boolean(state.fields?.confirm)} />
           {state.fields?.confirm && <small className="field-error">{state.fields.confirm.join(" ")}</small>}
         </div>
+        {state.error && <p role="alert" className="notice danger small">{state.error}</p>}
         <button className="button danger-button" disabled={pending}>{pending ? "Deleting…" : "Delete account and all data"}</button>
       </form>
     </div>

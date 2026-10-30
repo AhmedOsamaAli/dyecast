@@ -38,6 +38,8 @@ export async function createCheck(_previous: CheckState, form: FormData): Promis
 
 export async function deleteCheck(id: string): Promise<void> {
   const user = await requireUser();
+  const limit = await rateLimit(`check-delete:${user.id}`, 60, 60 * 1000);
+  if (!limit.ok) throw new Error("Too many deletions. Wait a minute and try again.");
   if (!(await removeCheck(user.id, id))) notFound();
   revalidatePath("/history");
   redirect("/history");

@@ -6,7 +6,8 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
  * - The DEK is stored wrapped (encrypted) with the server key (KEK) from PHOTO_ENCRYPTION_KEY.
  * - Every photo binds its owner and id as additional authenticated data, so ciphertext can't be
  *   swapped between users or rows without failing authentication.
- * - Deleting a user's wrapped DEK makes all their photos unreadable, including in backups (crypto-shredding).
+ * - Deleting a user's wrapped DEK makes their photos unreadable from then on. Copies in older database backups still
+ *   need the KEK, which is never stored in the database.
  */
 
 const ALGORITHM = "aes-256-gcm";

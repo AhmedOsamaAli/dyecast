@@ -199,12 +199,16 @@ the script and in [texture.ts](src/lib/hair/texture.ts), then run `node scripts/
 - On computers, photos can be taken with the webcam in the page: the camera runs only while its live view shows and
   stops as soon as the photo is taken; nothing is uploaded from the camera window.
 - Upload requires explicit consent. The server re-validates type by magic bytes, size and dimensions.
-- Each YouCam task gets its own upload, and the task is deleted right after its results are delivered, which also
-  deletes that uploaded photo at YouCam. Render URLs never reach the browser: images stream through the server once,
-  then the URL is discarded.
+- Each task gets its own upload. After delivery or failure, deletion is requested from YouCam; `deleted_at` is set
+  only after confirmation, so interrupted tasks and failed deletion requests remain queued for the daily cleanup.
+  Account deletion keeps this queue but detaches it from the account. An upload that never became a task cannot be
+  deleted through the File API and remains subject to YouCam's automatic retention (up to 30 days).
+- Render URLs never reach the browser: images stream through the server once, then the URL is discarded.
+- Photos kept in the browser (IndexedDB) for previews are tied to the signed-in account and expire after 30 days.
+  Signing out, deleting the account or "Clear photos on this device" removes them all.
 - Stored selfies are **off by default**. If enabled: AES-256-GCM with a per-user data key, wrapped by a server key
-  that never sits in the database; the ciphertext is bound to the user and photo (AAD), auto-deleted after 30 days,
-  served with `no-store`. Deleting destroys the user's key (crypto-shredding).
+  that never sits in the database; the ciphertext is bound to the user and photo (AAD), deleted by the daily cleanup
+  after 30 days, served with `no-store`. Deleting photos or the account deletes the user's key.
 
 **Accounts**
 - scrypt password hashing (N=2^15, r=8, p=1). Session tokens are random and stored only as SHA-256 hashes, in
@@ -212,19 +216,28 @@ the script and in [texture.ts](src/lib/hair/texture.ts), then run `node scripts/
 - Google sign-in uses OAuth 2.0 with PKCE and state, and validates the ID token's issuer, audience, expiry and verified
   email. Linking Google to an existing account whose email was never verified removes the old password and signs out
   its sessions (pre-account-hijacking defence).
-- DB-backed rate limits on every write: sign-in, registration, password changes, Google callbacks, profile saves,
-  checks, product-link lookups and YouCam calls. Per-user daily YouCam budgets plus a floor on the account's remaining
-  units.
-- Every query is scoped to the signed-in user; YouCam file and task IDs are checked for ownership.
+- DB-backed rate limits on every write: sign-in and registration (per email and per network address), password and
+  account changes, Google callbacks, profile saves, checks, deletions, exports, product-link lookups and YouCam calls.
+- YouCam budgets: per user per day, all users per day, and a floor on the account's remaining units. Units are held in
+  one atomic database statement *before* anything is uploaded, so parallel requests can't overshoot a cap, and holds
+  whose task never starts are refunded.
+- Every query is scoped to the signed-in user; YouCam file and task IDs are checked for ownership. Account deletion
+  clears every table explicitly, without relying on foreign-key enforcement.
+- YouCam's own error text stays in the server log; people get plain-language messages.
 
 **Web**
-- Content-Security-Policy, `X-Frame-Options: DENY`, `nosniff`, strict Referrer-Policy, Permissions-Policy (camera
-  only for this site), COOP, and HSTS in production. API mutations require a same-origin request.
-- The product-link reader blocks private and reserved addresses at connect time (DNS-rebinding safe), re-checks every
-  redirect (max 3), and caps time (8 s), size (1.5 MB) and content type (HTML only).
+- Content-Security-Policy with a fresh nonce per page (no `unsafe-inline` scripts). MediaPipe and Tesseract executable
+  assets are self-hosted from the installed dependencies by `scripts/sync-ai-assets.mjs` before builds/dev startup.
+  Only model data loads remotely. Includes `X-Frame-Options: DENY`, `nosniff`, strict Referrer-Policy,
+  Permissions-Policy (camera only for this site), COOP, and HSTS in production. API mutations require a same-origin
+  request.
+- The product-link reader blocks private and reserved addresses at connect time (DNS-rebinding safe), including IPv6
+  forms that carry an IPv4 address (`[::ffff:7f00:1]`, NAT64, 6to4, Teredo), re-checks every redirect (max 3), and caps
+  time (8 s), size (1.5 MB) and content type (HTML only).
 
-**Your data** — export everything as JSON, sign out on every device, or delete the account and all of its data from
-Settings. See [the in-app privacy page](src/app/privacy/page.tsx).
+**Your data** — export account data as JSON (photo metadata, not image files), sign out on every device, or delete the
+account from Settings. Usage records are detached from the account; old abuse-prevention counters are purged daily.
+See [the in-app privacy page](src/app/privacy/page.tsx).
 
 ## Run locally
 
@@ -250,6 +263,7 @@ Open http://localhost:3000, register, describe your hair, and check a shade or g
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in; the button appears only when both are set |
 | `PHOTO_ENCRYPTION_KEY` | 32-byte base64 key that wraps per-user photo keys; empty disables photo storage |
 | `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` | Database (local SQLite file by default) |
+| `CRON_SECRET` | Random secret Vercel Cron sends to the daily cleanup (`/api/cron/cleanup`, scheduled in `vercel.json`); without it the cleanup refuses to run |
 
 Generate a photo key with:
 
@@ -277,7 +291,7 @@ low for a public demo.
 |---|---|
 | `npm run dev` | Development server |
 | `npm run build` / `npm start` | Production build and server |
-| `npm test` | Vitest suite (239 tests) |
+| `npm test` | Vitest suite (273 tests) |
 | `npm run typecheck` | TypeScript, no emit |
 | `npm run lint` | ESLint |
 | `npm run db:generate` / `npm run db:migrate` | Create / apply Drizzle migrations |

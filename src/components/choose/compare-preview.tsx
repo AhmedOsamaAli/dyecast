@@ -68,7 +68,7 @@ export function ComparePreview({ picks }: { picks: ColorPick[] }) {
     return (
       <p className="compare-invite">
         <WandSparkles size={16} aria-hidden="true" /> See these colors on your own photo:{" "}
-        <Link href="/profile?next=choose">add a selfie in My hair</Link>. It stays on this device.
+        <Link href="/profile?next=choose">analyze a selfie in My hair</Link>. This browser then keeps it, for you only, for previews.
       </p>
     );
   }

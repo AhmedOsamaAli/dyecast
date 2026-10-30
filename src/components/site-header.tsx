@@ -1,13 +1,16 @@
 import Link from "next/link";
-import { History, LogOut, Palette, Settings, Target } from "lucide-react";
+import { History, Palette, Settings, Target } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
-import { logout } from "@/app/auth-actions";
+import { deviceOwnerTag } from "@/lib/auth/device";
+import { DeviceOwner } from "@/components/device-owner";
 import { NavLink } from "@/components/nav-link";
+import { SignOutButton } from "@/components/sign-out-button";
 
 export async function SiteHeader() {
   const user = await getCurrentUser();
   return (
     <header className="site-header">
+      <DeviceOwner owner={user ? deviceOwnerTag(user.id) : ""} />
       <Link href="/" className="wordmark" aria-label="DyeCast home">dye<span>cast</span><i /></Link>
       <nav aria-label="Main navigation">
         {user ? (
@@ -16,9 +19,7 @@ export async function SiteHeader() {
             <NavLink href="/profile"><Palette size={16} aria-hidden="true" /> <span className="nav-label">My hair</span></NavLink>
             <NavLink href="/history"><History size={16} aria-hidden="true" /> <span className="nav-label">Saved</span></NavLink>
             <NavLink href="/settings" className="user-name"><Settings size={16} aria-hidden="true" /> <span className="nav-label">{user.displayName}<span className="sr-only"> — settings</span></span></NavLink>
-            <form action={logout}>
-              <button className="icon-button" aria-label="Sign out" title="Sign out"><LogOut size={17} aria-hidden="true" /></button>
-            </form>
+            <SignOutButton />
           </>
         ) : (
           <>

@@ -1,10 +1,15 @@
 "use client";
 
+import { AI_ASSETS } from "@/lib/csp";
+
 /** Reads the text on a box photo entirely in the browser (Tesseract.js); the photo is never uploaded. */
 export async function readBoxText(image: Blob, onProgress?: (share: number) => void): Promise<string> {
   const canvas = await preprocess(image);
   const { createWorker } = await import("tesseract.js");
   const worker = await createWorker("eng", 1, {
+    workerPath: new URL(`${AI_ASSETS.tesseract}worker.min.js`, window.location.origin).href,
+    corePath: new URL(AI_ASSETS.tesseractCore, window.location.origin).href,
+    langPath: AI_ASSETS.tesseractData,
     logger: (m: { status?: string; progress?: number }) => {
       if (m.status === "recognizing text" && typeof m.progress === "number") onProgress?.(m.progress);
     },

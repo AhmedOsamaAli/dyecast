@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CompareSlider } from "@/components/ui/compare-slider";
 import { ApiError, fetchRender, fetchStoredSelfie, startRender, uploadPhoto, waitForTask, type RenderRequest } from "@/lib/client/api";
 import { blobToCanvas } from "@/lib/client/image";
-import { getLocal, putLocal, renderKey, SELFIE_KEY, type LocalEntry } from "@/lib/client/local-store";
+import { deviceOwner, getLocal, putLocal, renderKey, SELFIE_KEY, type LocalEntry } from "@/lib/client/local-store";
 
 interface Props {
   checkId: string;
@@ -63,10 +63,11 @@ export function PhotoPreview({ checkId, promiseHex, rootsHex, lengthsHex, twoZon
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const owner = deviceOwner();
       let entry = await getLocal(SELFIE_KEY);
       if (!entry && hasStoredSelfie) {
         const blob = await fetchStoredSelfie().catch(() => null);
-        if (blob) entry = { blob, savedAt: Date.now() };
+        if (blob) entry = { blob, savedAt: Date.now(), owner };
       }
       const [promise, reality] = await Promise.all([getLocal(renderKey(checkId, "promise")), getLocal(renderKey(checkId, "reality"))]);
       if (cancelled) return;
@@ -82,7 +83,11 @@ export function PhotoPreview({ checkId, promiseHex, rootsHex, lengthsHex, twoZon
         setRenders({ promise: track(promise.blob), reality: track(reality.blob), engine: promise.engine ?? "device" });
       }
       setLoading(false);
-    })();
+    })().catch((error: unknown) => {
+      if (cancelled) return;
+      setError(error instanceof Error ? error.message : "The saved photo could not be read.");
+      setLoading(false);
+    });
     const owned = urls.current;
     return () => {
       cancelled = true;
@@ -91,8 +96,9 @@ export function PhotoPreview({ checkId, promiseHex, rootsHex, lengthsHex, twoZon
   }, [checkId, hasStoredSelfie]);
 
   async function save(promise: Blob, reality: Blob, engine: Engine) {
-    await putLocal(renderKey(checkId, "promise"), { blob: promise, savedAt: Date.now(), engine });
-    await putLocal(renderKey(checkId, "reality"), { blob: reality, savedAt: Date.now(), engine });
+    if (!selfie) throw new Error("Add a selfie before saving a preview.");
+    await putLocal(renderKey(checkId, "promise"), { blob: promise, savedAt: Date.now(), engine, owner: selfie.owner });
+    await putLocal(renderKey(checkId, "reality"), { blob: reality, savedAt: Date.now(), engine, owner: selfie.owner });
     setRenders({ promise: track(promise), reality: track(reality), engine });
   }
 
@@ -152,7 +158,8 @@ export function PhotoPreview({ checkId, promiseHex, rootsHex, lengthsHex, twoZon
         <div>
           <p className="eyebrow">SEE IT ON YOU</p>
           <h2>Add a selfie to see this on your own hair</h2>
-          <p className="muted small">Your photo stays on this device unless you choose encrypted storage in Settings.</p>
+          <p className="muted small">Analyze a selfie in My hair first. This browser keeps it for previews; a copy goes to YouCam only when you analyze or ask for a YouCam render.</p>
+          {error && <p role="alert" className="notice danger small">{error}</p>}
         </div>
         <Link className="button secondary" href="/profile">Add a photo in your profile</Link>
       </section>

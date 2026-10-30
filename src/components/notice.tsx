@@ -11,7 +11,8 @@ const MESSAGES: Record<string, { tone: "danger" | "success" | "info"; text: stri
   rate_limited: { tone: "danger", text: "Too many sign-in attempts. Please wait a few minutes." },
   password_changed: { tone: "success", text: "Password changed. Sign in again on each device." },
   signed_out_everywhere: { tone: "success", text: "You were signed out on every device." },
-  account_deleted: { tone: "success", text: "Your account and all its data were deleted." },
+  account_deleted: { tone: "success", text: "Your account was deleted, along with your photos, hair profile and saved checks." },
+  device_cleanup_failed: { tone: "danger", text: "Signed out, but saved photos could not be cleared. Clear this site's browser data before sharing this device." },
 };
 
 /** Shows a friendly message for ?error= or ?notice= codes (unknown codes are ignored, never echoed). */

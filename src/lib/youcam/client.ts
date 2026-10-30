@@ -1,4 +1,5 @@
 import "server-only";
+import { requestErrorMessage } from "./errors";
 import type { TaskResult, TaskStatus, YouCamFeature } from "./types";
 
 const BASE_URL = process.env.YOUCAM_API_BASE ?? "https://yce-api-01.makeupar.com";
@@ -51,12 +52,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiEnve
   }
   if (!res.ok) {
     const code = json.error_code ?? json.error ?? `http_${res.status}`;
-    throw new YouCamError(
-      json.error_message ?? json.message ?? `YouCam request failed (${res.status}).`,
-      String(code),
-      res.status,
-      res.status === 429 || res.status >= 500,
-    );
+    // YouCam's own message stays in the server log; people get plain words (see errors.ts).
+    console.error("YouCam request failed", res.status, String(code).slice(0, 80));
+    throw new YouCamError(requestErrorMessage(res.status), "photo_service", res.status, res.status === 429 || res.status >= 500);
   }
   return json;
 }

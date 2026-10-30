@@ -6,12 +6,23 @@ describe("SSRF address guard", () => {
   it.each([
     "127.0.0.1", "10.1.2.3", "172.16.5.4", "192.168.1.1", "169.254.169.254", "100.64.0.1", "0.0.0.0",
     "::1", "::", "fe80::1", "fd12:3456::1", "::ffff:127.0.0.1", "::ffff:10.0.0.1", "not-an-ip",
+    // The hex forms URL parsing produces, and other addresses that carry an IPv4 address.
+    "::ffff:7f00:1", "[::ffff:7f00:1]", "::ffff:a9fe:a9fe", "0:0:0:0:0:ffff:c0a8:101", "::7f00:1", "::127.0.0.1",
+    "64:ff9b::7f00:1", "2002:7f00:1::1", "2001:0:4136:e378:8000:63bf:3fff:fdd2", "2001:db8::1", "fec0::1", "ff02::1",
+    "fe80::1%eth0",
   ])("blocks %s", (ip) => {
     expect(isBlockedAddress(ip)).toBe(true);
   });
 
-  it.each(["8.8.8.8", "151.101.1.69", "2606:4700:4700::1111"])("allows public %s", (ip) => {
+  it.each(["8.8.8.8", "151.101.1.69", "2606:4700:4700::1111", "::ffff:8.8.8.8", "::ffff:808:808"])("allows public %s", (ip) => {
     expect(isBlockedAddress(ip)).toBe(false);
+  });
+
+  it("rejects private addresses however the link writes them", () => {
+    for (const bad of ["http://[::ffff:127.0.0.1]/", "http://[::ffff:7f00:1]/admin", "http://[::ffff:169.254.169.254]/latest/meta-data",
+      "http://2130706433/", "http://0x7f.1/", "http://[64:ff9b::a9fe:a9fe]/", "http://[::127.0.0.1]/"]) {
+      expect(checkPublicUrl(bad).ok, bad).toBe(false);
+    }
   });
 
   it("rejects non-web, credentialed, odd-port and internal URLs", () => {

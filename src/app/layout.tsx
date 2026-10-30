@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Fraunces, Geist } from "next/font/google";
+import { connection } from "next/server";
 import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
 
@@ -13,7 +14,9 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Nonces must be generated per request, never baked into static HTML.
+  await connection();
   return (
     <html lang="en" className={`${display.variable} ${sans.variable}`}>
       <body>

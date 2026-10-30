@@ -1,5 +1,6 @@
 import { after } from "next/server";
 import { apiError, apiUser, errorResponse, json } from "@/lib/http";
+import { taskErrorMessage } from "@/lib/youcam/errors";
 import { forgetRemoteTask, pollTask } from "@/lib/youcam/service";
 import {
   YOUCAM_FEATURES,
@@ -41,13 +42,14 @@ export async function GET(request: Request, ctx: RouteContext<"/api/youcam/tasks
   }
   try {
     const result = await pollTask(auth.user.id, feature as YouCamFeature, taskId);
-    // Analysis results are delivered in this response, so delete them from YouCam right away.
-    if (result.status !== "running" && feature !== "hair-color") after(() => forgetRemoteTask(taskId));
+    // Analysis results are delivered in this response, and a failed task has nothing to deliver: delete them from
+    // YouCam right away. Finished renders are deleted once downloaded (see renders/[taskId]).
+    if (result.status === "error" || (result.status === "success" && feature !== "hair-color")) after(() => forgetRemoteTask(taskId));
     return json({
       status: result.status,
       mock: Boolean(result.mock),
       results: publicResults(feature as YouCamFeature, result.results),
-      error: result.status === "error" ? (result.errorMessage ?? result.error ?? "The photo could not be analyzed.") : undefined,
+      error: result.status === "error" ? taskErrorMessage(result.error ?? result.errorMessage) : undefined,
     });
   } catch (error) {
     return errorResponse(error);

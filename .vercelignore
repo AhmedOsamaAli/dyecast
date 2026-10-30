@@ -7,5 +7,6 @@
 /.next/
 /node_modules/
 /coverage/
+/public/vendor/
 *.tsbuildinfo
 next-env.d.ts

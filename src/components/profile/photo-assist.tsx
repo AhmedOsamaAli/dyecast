@@ -13,7 +13,7 @@ import { analyzePhoto, ApiError, waitForTask, type TermResults, type ToneResults
 import { prepareImage } from "@/lib/client/image";
 import { readPhoto, type PhotoReading } from "@/lib/client/hair-vision";
 import { checkPhotoLighting, type LightingAdvice } from "@/lib/client/lighting";
-import { putLocal, SELFIE_KEY } from "@/lib/client/local-store";
+import { deviceOwner, putLocal, SELFIE_KEY } from "@/lib/client/local-store";
 import { TONE_LABELS } from "@/components/form-controls";
 import { HairSwatch } from "@/components/hair-swatch";
 import { PhotoSlot } from "@/components/profile/photo-slot";
@@ -85,6 +85,7 @@ export function PhotoAssist({ mockMode, storePhotos, onApply }: {
 
   async function analyze() {
     if (!photo || !consent) return;
+    const owner = deviceOwner();
     setStatus("working");
     setError("");
     try {
@@ -94,7 +95,7 @@ export function PhotoAssist({ mockMode, storePhotos, onApply }: {
 
       setProgress("Analyzing with YouCam AI…");
       const started = await analyzePhoto(photo.blob, densityPhoto?.blob);
-      await putLocal(SELFIE_KEY, { blob: photo.blob, savedAt: Date.now() });
+      await putLocal(SELFIE_KEY, { blob: photo.blob, savedAt: Date.now(), owner });
       const [tone, length, density, measured] = await Promise.all([
         waitForTask<ToneResults>("skin-tone-analysis", started.tasks.tone),
         waitForTask<TermResults>("hair-length-detection", started.tasks.length),
@@ -150,7 +151,7 @@ export function PhotoAssist({ mockMode, storePhotos, onApply }: {
         <p>
           <strong>Your photo stays on this device.</strong> Taking or choosing a photo uploads nothing, and your hair color is
           measured right here. Only when you tap <em>Analyze</em> does a cleaned copy (no location or camera data) go to YouCam,
-          which deletes it right after. {storePhotos ? "Your settings also keep an encrypted copy for 30 days." : "We don't keep it on our servers."}
+          and we ask YouCam to delete it as soon as the results arrive. {storePhotos ? "Your settings also keep an encrypted copy for 30 days." : "We don't keep it on our servers."}
         </p>
       </div>
 
@@ -192,7 +193,7 @@ export function PhotoAssist({ mockMode, storePhotos, onApply }: {
 
       <label className="check-row">
         <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-        <span>Send a cleaned copy to YouCam (by Perfect Corp) to analyze my hair. It&apos;s deleted right after.</span>
+        <span>Send a cleaned copy to YouCam (by Perfect Corp) to analyze my hair. We ask YouCam to delete it as soon as the results arrive.</span>
       </label>
 
       <button type="button" className="button full" disabled={!consent || !photo || status === "working"} onClick={analyze}>

@@ -1,7 +1,8 @@
 import "server-only";
-import { eq, sql } from "drizzle-orm";
+import { eq, lt, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { rateLimits } from "@/lib/db/schema";
+import { sha256 } from "./crypto";
 
 export interface RateLimitResult {
   ok: boolean;
@@ -34,4 +35,14 @@ export async function rateLimit(key: string, limit: number, windowMs: number): P
 
 export async function resetRateLimit(key: string): Promise<void> {
   await db.delete(rateLimits).where(eq(rateLimits.key, key));
+}
+
+/** All limiter windows are at most one hour; discard old counters rather than keeping hashed addresses indefinitely. */
+export async function purgeOldRateLimits(now = Date.now()): Promise<void> {
+  await db.delete(rateLimits).where(lt(rateLimits.windowStart, new Date(now - 24 * 60 * 60 * 1000)));
+}
+
+/** The caller's IP address (as the host reports it), hashed: for per-address limits without storing addresses. */
+export function ipKey(headers: Headers): string {
+  return sha256(headers.get("x-real-ip") ?? headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local");
 }

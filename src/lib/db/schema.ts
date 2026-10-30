@@ -104,9 +104,15 @@ export const apiUsage = sqliteTable(
     mock: integer("mock", { mode: "boolean" }).notNull(),
     /** Hair-color render URL (valid ~2h at YouCam); proxied, never sent to the browser. */
     resultUrl: text("result_url"),
+    /** Set only after YouCam confirms deletion; null tasks stay queued for cleanup. */
+    deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
     createdAt: createdAt(),
   },
-  (t) => [index("api_usage_user_idx").on(t.userId, t.createdAt), uniqueIndex("api_usage_task_idx").on(t.taskId)],
+  (t) => [
+    index("api_usage_user_idx").on(t.userId, t.createdAt),
+    uniqueIndex("api_usage_task_idx").on(t.taskId),
+    index("api_usage_cleanup_idx").on(t.deletedAt, t.createdAt),
+  ],
 );
 
 export type User = typeof users.$inferSelect;

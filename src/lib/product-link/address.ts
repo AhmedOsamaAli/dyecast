@@ -30,22 +30,54 @@ function inV4Block(ip: string): boolean {
   });
 }
 
+/** The eight 16-bit groups of a valid IPv6 address (also when it ends in dotted IPv4), or null. */
+function ipv6Groups(ip: string): number[] | null {
+  let text = ip.replace(/%.*$/, "");
+  const dotted = /(\d{1,3}(?:\.\d{1,3}){3})$/.exec(text);
+  if (dotted) {
+    const n = ipv4ToInt(dotted[1]);
+    text = `${text.slice(0, dotted.index)}${(n >>> 16).toString(16)}:${(n & 0xffff).toString(16)}`;
+  }
+  const halves = text.split("::");
+  if (halves.length > 2) return null;
+  const groupsOf = (s: string) => (s ? s.split(":") : []);
+  const left = groupsOf(halves[0]);
+  const right = halves.length === 2 ? groupsOf(halves[1]) : [];
+  const fill = halves.length === 2 ? 8 - left.length - right.length : 0;
+  if (fill < 0 || (halves.length === 1 && left.length !== 8)) return null;
+  const groups = [...left, ...Array<string>(fill).fill("0"), ...right].map((g) => (/^[0-9a-f]{1,4}$/.test(g) ? parseInt(g, 16) : NaN));
+  return groups.length === 8 && groups.every((g) => !Number.isNaN(g)) ? groups : null;
+}
+
+/**
+ * Non-public IPv6 ranges. Addresses that carry an IPv4 address (mapped, compatible, NAT64, 6to4, Teredo) are judged
+ * by it or refused, because URL parsing writes them in hex (http://[::ffff:127.0.0.1]/ becomes [::ffff:7f00:1]).
+ */
+function ipv6Blocked(g: number[]): boolean {
+  const [a, b] = g;
+  if (g.slice(0, 5).every((x) => x === 0)) {
+    // ::, ::1 and IPv4-compatible addresses are refused; an IPv4-mapped one is judged by its IPv4 address.
+    if (g[5] !== 0xffff) return true;
+    return inV4Block([g[6] >> 8, g[6] & 0xff, g[7] >> 8, g[7] & 0xff].join("."));
+  }
+  if (a === 0x64 && b === 0xff9b) return true; // NAT64 (64:ff9b::/96, 64:ff9b:1::/48)
+  if (a === 0x2002) return true; // 6to4
+  if (a === 0x2001 && (b === 0 || b === 0xdb8)) return true; // Teredo, documentation
+  if (a === 0x100 && g[1] === 0 && g[2] === 0 && g[3] === 0) return true; // discard-only 100::/64
+  if ((a & 0xfe00) === 0xfc00) return true; // fc00::/7 unique local
+  if ((a & 0xffc0) === 0xfe80 || (a & 0xffc0) === 0xfec0) return true; // link local, old site local
+  if ((a & 0xff00) === 0xff00) return true; // multicast
+  return false;
+}
+
 /** True for loopback, private, link-local, CGNAT, multicast, documentation and other non-public addresses. */
 export function isBlockedAddress(address: string): boolean {
   const ip = address.trim().toLowerCase().replace(/^\[|\]$/g, "");
   const family = isIP(ip);
   if (family === 4) return inV4Block(ip);
   if (family !== 6) return true;
-  if (ip === "::" || ip === "::1") return true;
-  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(ip);
-  if (mapped) return inV4Block(mapped[1]);
-  const first = parseInt(ip.split(":")[0] || "0", 16);
-  if ((first & 0xfe00) === 0xfc00) return true; // fc00::/7 unique local
-  if ((first & 0xffc0) === 0xfe80) return true; // fe80::/10 link local
-  if ((first & 0xff00) === 0xff00) return true; // ff00::/8 multicast
-  if (ip.startsWith("2001:db8:")) return true; // documentation
-  if (ip.startsWith("64:ff9b:")) return true; // NAT64
-  return false;
+  const groups = ipv6Groups(ip);
+  return groups === null || ipv6Blocked(groups);
 }
 
 export type UrlCheck = { ok: true; url: URL } | { ok: false; error: string };

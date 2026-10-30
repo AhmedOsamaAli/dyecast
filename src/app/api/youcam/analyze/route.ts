@@ -1,13 +1,22 @@
 import { eq } from "drizzle-orm";
+import { after } from "next/server";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { db } from "@/lib/db/client";
 import { users } from "@/lib/db/schema";
 import { apiError, apiUser, errorResponse, json } from "@/lib/http";
 import { photoStorageAvailable, saveSelfie } from "@/lib/photos/store";
 import { validateImage } from "@/lib/photos/validate";
-import { startTask, uploadForUser } from "@/lib/youcam/service";
+import {
+  forgetRemoteTask,
+  releaseReservation,
+  reserveUnits,
+  startReserved,
+  uploadForUser,
+  type Reservation,
+} from "@/lib/youcam/service";
+import type { YouCamFeature } from "@/lib/youcam/types";
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 async function readImage(form: FormData, field: string) {
   const file = form.get(field);
@@ -44,21 +53,34 @@ export async function POST(request: Request): Promise<Response> {
   const density = await readImage(form, "densityPhoto");
   if (density && !density.check.ok) return apiError(`Hair density photo: ${density.check.error}`, 400, "bad_photo");
 
+  // Units are held before anything is uploaded, so a refused request never sends a photo anywhere.
+  const features: YouCamFeature[] = ["skin-tone-analysis", "hair-length-detection", ...(density ? (["hair-density-detection"] as const) : [])];
+  let holds: Reservation[];
+  try {
+    holds = await reserveUnits(user.id, features);
+  } catch (error) {
+    return errorResponse(error);
+  }
+  const [toneHold, lengthHold, densityHold] = holds;
+  const started: string[] = [];
+  const start = async (hold: Reservation, body: Record<string, unknown>) => {
+    const task = await startReserved(hold, body);
+    started.push(task.taskId);
+    return task;
+  };
+
   try {
     // One upload per task: YouCam deletes a task's input file when we delete the finished task.
     const mime = selfie.check.image.mime;
-    const [toneUpload, lengthUpload] = await Promise.all([
-      uploadForUser(user.id, selfie.bytes.buffer as ArrayBuffer, mime),
-      uploadForUser(user.id, selfie.bytes.buffer as ArrayBuffer, mime),
-    ]);
-    const [tone, length] = await Promise.all([
-      startTask(user.id, "skin-tone-analysis", { src_file_id: toneUpload.fileId, face_angle_strictness_level: "medium" }),
-      startTask(user.id, "hair-length-detection", { src_file_id: lengthUpload.fileId }),
-    ]);
+    // Finish each upload/start pair before the next, so a failed sibling cannot start after cleanup has run.
+    const toneUpload = await uploadForUser(user.id, selfie.bytes.buffer as ArrayBuffer, mime);
+    const tone = await start(toneHold, { src_file_id: toneUpload.fileId, face_angle_strictness_level: "medium" });
+    const lengthUpload = await uploadForUser(user.id, selfie.bytes.buffer as ArrayBuffer, mime);
+    const length = await start(lengthHold, { src_file_id: lengthUpload.fileId });
     let densityTask: string | undefined;
-    if (density?.check.ok) {
+    if (density?.check.ok && densityHold) {
       const densityUpload = await uploadForUser(user.id, density.bytes.buffer as ArrayBuffer, density.check.image.mime);
-      densityTask = (await startTask(user.id, "hair-density-detection", { src_file_id: densityUpload.fileId })).taskId;
+      densityTask = (await start(densityHold, { src_file_id: densityUpload.fileId })).taskId;
     }
 
     const [settings] = await db.select({ storePhotos: users.storePhotos }).from(users).where(eq(users.id, user.id)).limit(1);
@@ -74,6 +96,13 @@ export async function POST(request: Request): Promise<Response> {
       storedUntil,
     });
   } catch (error) {
+    // Nothing reaches the browser, so refund the holds still open and delete the tasks that did start (with their
+    // uploaded copies) once they finish. Anything still running then is caught by the daily cleanup.
+    const refunds = await Promise.allSettled(holds.map(releaseReservation));
+    if (refunds.some((r) => r.status === "rejected")) console.error("Unused photo reservations remain queued for cleanup.");
+    after(async () => {
+      await Promise.all(started.map(forgetRemoteTask));
+    });
     return errorResponse(error);
   }
 }

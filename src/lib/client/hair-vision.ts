@@ -2,12 +2,12 @@
 
 import type { ImageSegmenter } from "@mediapipe/tasks-vision";
 import { hexToLab, type Lab } from "@/lib/color";
+import { AI_ASSETS } from "@/lib/csp";
 import { readHair, robustHairLab, type HairReading } from "@/lib/engine/measure";
 import { blobToCanvas } from "@/lib/client/image";
 
-const WASM_BASE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.1/wasm";
-const MODEL_URL =
-  "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite";
+const WASM_BASE = `${AI_ASSETS.mediapipe}wasm`;
+const MODEL_URL = `${AI_ASSETS.mediapipeModels}image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite`;
 /** selfie_multiclass labels: 0 background, 1 hair, 2 body skin, 3 face skin, 4 clothes, 5 other. */
 const HAIR = 1;
 const FACE_SKIN = 3;

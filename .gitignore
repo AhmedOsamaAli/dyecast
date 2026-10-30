@@ -44,5 +44,6 @@ next-env.d.ts
 data/*.db*
 # downloaded build inputs (e.g. the source photo for public/hair, see scripts/hair-photo.mjs)
 /.cache/
+/public/vendor/
 # env (keep the example)
 !.env.example

@@ -45,7 +45,7 @@ import CheckPage from "@/app/checks/[id]/page";
 import { getCurrentUser, SESSION_COOKIE } from "@/lib/auth/session";
 import { sha256 } from "@/lib/auth/crypto";
 import { upsertGoogleUser } from "@/lib/auth/google";
-import { deleteAllPhotos, loadSelfie, saveSelfie, selfieInfo } from "@/lib/photos/store";
+import { deleteAllPhotos, loadSelfie, purgeAllExpired, saveSelfie, selfieInfo } from "@/lib/photos/store";
 import { DEFAULT_PROFILE } from "../validation";
 
 function form(values: Record<string, unknown>) {
@@ -226,6 +226,25 @@ describe("profile and checks", () => {
 });
 
 describe("photo storage and account deletion", () => {
+  it("purges expired selfies without a visit, removes unused keys, and preserves unexpired photos", async () => {
+    await signup();
+    const expired = (await getCurrentUser())!;
+    await saveSelfie(expired.id, randomBytes(256), "image/jpeg");
+    await db.update(photos).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(photos.userId, expired.id));
+
+    await signup("unexpired@example.com");
+    const current = (await getCurrentUser())!;
+    const bytes = randomBytes(256);
+    await saveSelfie(current.id, bytes, "image/png");
+    expect(await purgeAllExpired()).toBe(1);
+    const [oldOwner] = await db.select().from(users).where(eq(users.id, expired.id));
+    const [currentOwner] = await db.select().from(users).where(eq(users.id, current.id));
+    expect(oldOwner.photoKey).toBeNull();
+    expect(currentOwner.photoKey).not.toBeNull();
+    expect((await loadSelfie(current.id))?.bytes.equals(bytes)).toBe(true);
+    expect(await purgeAllExpired()).toBe(0);
+  });
+
   it("encrypts stored selfies per user and crypto-shreds them on deletion", async () => {
     await signup();
     const user = (await getCurrentUser())!;
