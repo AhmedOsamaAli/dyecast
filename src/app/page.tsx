@@ -30,12 +30,12 @@ const FEATURES = [
   { icon: ScanLine, title: "Reads the box for you", text: "Point your phone at the box: the shade number is read on your device." },
   { icon: Link2, title: "Paste any store link", text: "We read the product page and find the shade, so you can check before you buy." },
   { icon: Droplet, title: "Routes, toners and boxes", text: "Better routes to your goal, a toner when it helps, and how many boxes your hair needs." },
-  { icon: ShieldCheck, title: "Private by design", text: "Photos are cleaned on your device, deleted at YouCam right away, and stored encrypted only if you ask." },
+  { icon: ShieldCheck, title: "Private by design", text: "Photos are cleaned on your device. We request deletion after processing, retry unconfirmed requests, and store encrypted copies only if you ask." },
 ];
 
 const FAQ = [
   { q: "How accurate is the forecast?", a: "It applies general hair color chemistry to the hair you describe, so it's a well-reasoned forecast, not a lab test of one brand's formula. Brands, lighting and your hair's condition still vary — a strand test is the only true preview." },
-  { q: "Do you keep my photo?", a: "No, unless you turn on encrypted storage. Photos are cleaned in your browser, YouCam deletes them as soon as we receive the result, and box and inspiration photos never leave your device." },
+  { q: "Do you keep my photo?", a: "Your browser keeps analyzed selfies for previews until sign-out or expiry. Our servers keep an encrypted copy only if you opt in. YouCam receives a copy with your consent; deletion is requested after processing and retried if unconfirmed. Box and inspiration photos never leave your device." },
   { q: "Which boxes work?", a: "Any box with a shade number: international (7.1), Wella-style (7/1), Schwarzkopf-style (7-1) and US letter codes (6G). You can also start from the color you want." },
   { q: "Is it free?", a: "Yes. Create an account to save your hair profile and your checks." },
   { q: "Is this medical advice?", a: "No. DyeCast adds a safety checklist and stop signs, but your product's instructions, the allergy alert test and a strand test always come first." },

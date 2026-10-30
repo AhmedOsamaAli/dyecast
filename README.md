@@ -291,7 +291,7 @@ low for a public demo.
 |---|---|
 | `npm run dev` | Development server |
 | `npm run build` / `npm start` | Production build and server |
-| `npm test` | Vitest suite (273 tests) |
+| `npm test` | Vitest suite (276 tests) |
 | `npm run typecheck` | TypeScript, no emit |
 | `npm run lint` | ESLint |
 | `npm run db:generate` / `npm run db:migrate` | Create / apply Drizzle migrations |

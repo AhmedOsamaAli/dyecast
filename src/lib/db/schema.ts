@@ -104,7 +104,7 @@ export const apiUsage = sqliteTable(
     mock: integer("mock", { mode: "boolean" }).notNull(),
     /** Hair-color render URL (valid ~2h at YouCam); proxied, never sent to the browser. */
     resultUrl: text("result_url"),
-    /** Set only after YouCam confirms deletion; null tasks stay queued for cleanup. */
+    /** Set only after YouCam confirms deletion or that the task is absent; otherwise cleanup retries. */
     deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
     createdAt: createdAt(),
   },

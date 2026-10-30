@@ -48,13 +48,15 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiEnve
   try {
     json = text ? (JSON.parse(text) as ApiEnvelope<T>) : {};
   } catch {
-    // Non-JSON error bodies are reported by status below.
+    if (res.ok) throw new YouCamError("The photo service returned an unreadable response.", "bad_response", 502, true);
   }
-  if (!res.ok) {
-    const code = json.error_code ?? json.error ?? `http_${res.status}`;
+  const status = !res.ok ? res.status : typeof json.status === "number" && json.status >= 400 ? json.status : res.status;
+  if (!res.ok || status >= 400) {
+    const code = json.error_code ?? json.error ?? `http_${status}`;
     // YouCam's own message stays in the server log; people get plain words (see errors.ts).
-    console.error("YouCam request failed", res.status, String(code).slice(0, 80));
-    throw new YouCamError(requestErrorMessage(res.status), "photo_service", res.status, res.status === 429 || res.status >= 500);
+    console.error("YouCam request failed", status, String(code).slice(0, 80));
+    const missingTask = /^(InvalidTaskId|Invalid task ID)$/i.test(String(code));
+    throw new YouCamError(requestErrorMessage(status), missingTask ? "task_not_found" : "photo_service", status, status === 429 || status >= 500);
   }
   return json;
 }
@@ -105,8 +107,11 @@ export async function getTask<T>(feature: YouCamFeature, taskId: string): Promis
     `/s2s/v2.0/task/${feature}/${encodeURIComponent(taskId)}`,
   );
   const data = json.data ?? {};
+  if (data.task_status !== "running" && data.task_status !== "success" && data.task_status !== "error") {
+    throw new YouCamError("The photo service returned an unreadable task status.", "bad_task_response", 502, true);
+  }
   return {
-    status: data.task_status ?? "running",
+    status: data.task_status,
     results: data.results,
     error: data.error ?? undefined,
     errorMessage: data.error_message,
@@ -121,7 +126,10 @@ export async function getRemainingUnits(): Promise<number> {
 
 /** Deletes a task and its results from YouCam's servers (privacy: we keep nothing we don't need). */
 export async function deleteTask(taskId: string): Promise<void> {
-  await request<never>("/s2s/v2.0/task/delete", { method: "POST", body: JSON.stringify({ task_id: taskId }) });
+  const response = await request<never>("/s2s/v2.0/task/delete", { method: "POST", body: JSON.stringify({ task_id: taskId }) });
+  if (response.status !== 200) {
+    throw new YouCamError("The photo service did not confirm deletion.", "deletion_unconfirmed", 502, true);
+  }
 }
 
 /** Hosts YouCam serves results from. Render URLs from anywhere else are refused (SSRF guard). */

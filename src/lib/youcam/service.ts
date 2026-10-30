@@ -298,7 +298,7 @@ async function deleteRemoteTask(taskId: string): Promise<boolean> {
   try {
     await deleteTask(taskId);
   } catch (error) {
-    if (!(error instanceof YouCamError && (error.httpStatus === 404 || error.httpStatus === 410))) {
+    if (!(error instanceof YouCamError && (error.code === "task_not_found" || error.httpStatus === 404 || error.httpStatus === 410))) {
       console.error("YouCam task deletion was not confirmed; left queued for retry.",
         error instanceof YouCamError ? error.httpStatus : "network");
       return false;
@@ -352,7 +352,7 @@ export async function sweepStaleTasks(now = Date.now(), limit = 100): Promise<{ 
         const task = await getTask(row.feature as YouCamFeature, row.taskId);
         if (task.status !== "running") status = task.status;
       } catch (error) {
-        gone = error instanceof YouCamError && (error.httpStatus === 404 || error.httpStatus === 410);
+        gone = error instanceof YouCamError && (error.code === "task_not_found" || error.httpStatus === 404 || error.httpStatus === 410);
         if (!gone) console.error("YouCam cleanup could not read a task; left queued for retry.",
           error instanceof YouCamError ? error.httpStatus : "network");
       }
