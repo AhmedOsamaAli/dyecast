@@ -1,7 +1,7 @@
 {
   "beats": [
     {
-      "id": "hook", "seconds": 9, "eyebrow": "BEFORE YOU DYE",
+      "id": "hook", "seconds": 10, "eyebrow": "BEFORE YOU DYE",
       "headline": "The box has a promise.", "accent": "Your hair has a history.",
       "detail": "See the difference before the color is on your head.",
       "caption": "The promise is not the forecast.",
@@ -12,7 +12,8 @@
       "headline": "Your hair.", "accent": "Not someone else's.",
       "detail": "Depth. Tone. History. You confirm the starting point.",
       "caption": "A photo suggests. You decide.",
-      "narration": "Start with your own hair. Tell us its depth, tone and color history. Or let a photo suggest a starting point. You stay in control."
+      "api": ["YouCam API", "Facial Color Tones", "Hair Length", "Hair Density"],
+      "narration": "Start with your own hair. Tell us its depth, tone and color history. Or use YouCam Facial Color Tones and Hair Length Detection to suggest a starting point. You confirm every choice."
     },
     {
       "id": "choose", "seconds": 14, "eyebrow": "02 / HELP ME CHOOSE",
@@ -33,7 +34,8 @@
       "headline": "The promise.", "accent": "The likely result.",
       "detail": "Put the box beside a forecast for your starting hair.",
       "caption": "Compare the box with your forecast.",
-      "narration": "Now check a box. The forecast puts its promise next to your likely result. Dark hair cannot simply become platinum from one box."
+      "api": ["YouCam API", "Hair Color Virtual Try-On"],
+      "narration": "Now check a box. The forecast puts its promise next to your likely result. YouCam Hair Color renders both on your photo. Dark hair cannot simply become platinum from one box."
     },
     {
       "id": "why", "seconds": 12, "eyebrow": "05 / UNDERSTAND THE DIFFERENCE",

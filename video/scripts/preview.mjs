@@ -3,13 +3,15 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
+const release = process.argv.includes("--release");
+const assetDirectory = release ? "release" : "footage";
 const story = JSON.parse(await readFile(join(root, "src", "beats.json"), "utf8"));
 const stylesheet = await readFile(join(root, "src", "style.css"), "utf8");
 const escape = (text) => String(text).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll('"', "&quot;");
 const cache = new Map();
 async function image(name, className = "", style = "") {
   if (!cache.has(name)) {
-    const bytes = await readFile(join(root, "public", "footage", name));
+    const bytes = await readFile(join(root, "public", assetDirectory, name));
     cache.set(name, `data:image/${name.endsWith(".png") ? "png" : "jpeg"};base64,${bytes.toString("base64")}`);
   }
   return `<img src="${cache.get(name)}" class="${className}" style="${style}" alt="${escape(name)}">`;
@@ -21,7 +23,7 @@ for (const [slug, family] of [["fraunces", "Fraunces Variable"], ["geist", "Geis
   const directory = join(root, "node_modules", "@fontsource-variable", slug);
   const files = await readdir(join(directory, "files"));
   for (const style of ["normal", "italic"]) {
-    const file = files.find((name) => name.startsWith(`${slug}-latin-`) && name.endsWith(`-${style}.woff2`));
+    const file = files.find((name) => name.startsWith(`${slug}-latin-wght-`) && name.endsWith(`-${style}.woff2`));
     if (!file && style === "normal") throw new Error(`Missing ${family} font.`);
     if (!file) continue;
     const data = await readFile(join(directory, "files", file));
@@ -32,11 +34,20 @@ for (const [slug, family] of [["fraunces", "Fraunces Variable"], ["geist", "Geis
   licenses.push(`${family}\n${await readFile(join(directory, licenseFile), "utf8")}`);
 }
 
-async function capture(file, phoneFile) {
+async function capture(file, phoneFile, alternate) {
   return `<div class="capture"><div class="browser-bar"><div class="browser-dots"><span></span><span></span><span></span></div><span>dyecast.vercel.app</span><span class="live-mark">REAL APP</span></div><div class="capture-screen">
     ${await image(file, phoneFile ? "desktop-asset" : "")}
     ${phoneFile ? await image(phoneFile, "phone-asset") : ""}
+    ${alternate ? await image(alternate, "alternate-asset desktop-asset", "position:absolute;inset:0;opacity:0") : ""}
   </div></div>`;
+}
+
+async function photoStrip(device = false) {
+  const panels = device
+    ? [["device-today.jpg", "Today"], ["device-honey.jpg", "Honey blonde"], ["device-caramel.jpg", "Caramel brown"], ["device-copper.jpg", "Copper red"]]
+    : [["photo-today.jpg", "Today"], ["photo-box.jpg", "The box"], ["photo-likely.jpg", "Your forecast"]];
+  return `<div class="photo-strip${device ? " trial-strip" : ""}">${(await Promise.all(panels.map(async ([name, label]) =>
+    `<figure>${await image(name)}<figcaption>${label}</figcaption></figure>`))).join("")}</div>`;
 }
 
 async function compare() {
@@ -49,11 +60,11 @@ for (const [index, beat] of story.beats.entries()) {
   switch (beat.id) {
     case "hook": media = await compare(); break;
     case "profile": media = await capture("profile.png", "photo-assist.png"); break;
-    case "choose": media = await capture("choose-cards.png", "choose-best.png"); break;
-    case "try": media = await capture("try-colors.png", "try-colors-phone.png"); break;
-    case "reality": media = `<div class="photo-strip">${(await Promise.all([["photo-today.jpg", "Today"], ["photo-box.jpg", "The box"], ["photo-likely.jpg", "Your forecast"]].map(async ([name, label]) => `<figure>${await image(name)}<figcaption>${label}</figcaption></figure>`))).join("")}</div>`; break;
+    case "choose": media = await capture("choose-cards.png", "choose-best.png", "choose-alternate.png"); break;
+    case "try": media = release ? await photoStrip(true) : await capture("try-colors.png", "try-colors-phone.png"); break;
+    case "reality": media = `<div class="reality-compare">${await compare()}</div><div class="reality-photos">${await photoStrip()}</div>`; break;
     case "why": media = await capture("why.png"); break;
-    case "buy": media = await capture("products.png"); break;
+    case "buy": media = await capture("products.png", undefined, "plan.png"); break;
     case "privacy": media = `<div class="privacy-cards">${["Quick previews on your device", "Consent before YouCam processing", "Stored selfies off by default", "Local photos cleared at sign-out"].map((label, n) => `<div><span>0${n + 1}</span><strong>${label}</strong><b>&#10003;</b></div>`).join("")}<p>Deletion is requested after delivery and retried if unconfirmed.</p></div>`; break;
     case "close": media = `<div class="closing-hair">${await image("swatch-likely.png")}<div></div></div>`; break;
     default: throw new Error(`Unsupported preview scene: ${beat.id}`);
@@ -62,7 +73,7 @@ for (const [index, beat] of story.beats.entries()) {
   sections.push(`<section class="scene landscape scene-${beat.id}${beat.id === "close" ? " dark" : ""}" data-seconds="${beat.seconds}" ${index ? "hidden" : ""}>
     <div class="background-orbit orbit-one"></div><div class="background-orbit orbit-two"></div>
     <header class="film-header"><span class="wordmark">dye<i>cast</i><b>.</b></span><span>YOUR COLOR, WITH CONTEXT</span><div class="beat-dots">${story.beats.map((_, n) => `<i class="${n === index ? "active" : ""}"></i>`).join("")}</div></header>
-    <div class="copy"><p class="eyebrow">${escape(beat.eyebrow)}</p><h1>${escape(beat.headline)}<em>${escape(beat.accent)}</em></h1><p class="detail">${escape(beat.detail)}</p>${beat.id === "close" ? '<div class="visit">dyecast.vercel.app &#8599;</div><p class="safety">Follow the box instructions.<br>Allergy alert test. Strand test.</p>' : ""}</div>
+    <div class="copy"><p class="eyebrow">${escape(beat.eyebrow)}</p><h1>${escape(beat.headline)}<em>${escape(beat.accent)}</em></h1><p class="detail">${escape(beat.detail)}</p>${beat.api ? `<div class="tags">${beat.api.map((tag) => `<span>${escape(tag)}</span>`).join("")}</div>` : ""}${beat.id === "close" ? '<div class="visit">dyecast.vercel.app &#8599;</div><p class="safety">Follow the box instructions.<br>Allergy alert test. Strand test.</p>' : ""}</div>
     <div class="media">${media}</div><footer class="film-footer"><span class="caption">${escape(beat.caption)}</span><span class="source">${source}</span></footer>
   </section>`);
 }
@@ -73,6 +84,9 @@ html,body{background:#ece5dc;color:#241e19;font-family:"Geist Variable",sans-ser
 .preview-stage{position:relative;margin:0 auto;overflow:hidden;background:#fbf8f3;box-shadow:0 15px 50px #45210f25;border-radius:14px}
 #film{position:absolute;left:0;top:0;transform-origin:0 0}.scene{position:absolute;inset:0}.scene[hidden]{display:none}
 .phone-asset{display:none!important}.portrait .desktop-asset{display:none!important}.portrait .phone-asset{display:block!important}
+.alternate-asset{object-position:top}.reality-compare{display:none;width:100%;height:100%}.reality-photos{width:100%}
+.trial-strip{gap:12px}.trial-strip figure{width:calc((100% - 36px)/4)}.trial-strip img{height:390px}.trial-strip figcaption{font-size:18px}
+.portrait .trial-strip{grid-template-columns:1fr 1fr}.portrait .trial-strip figure{width:auto}.portrait .trial-strip figure:nth-child(2){display:block}.portrait .trial-strip img{height:330px}.portrait .trial-strip figcaption{font-size:26px}
 .preview-controls{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;padding:22px}
 button{font:500 14px "Geist Variable";padding:10px 16px;border:1px solid #d6c5b5;border-radius:9px;background:#fffaf4;color:#623d2b;cursor:pointer}button:hover{background:#f4e3d6}
 #play{background:#8a4530;color:#fff;border-color:#8a4530}#counter{min-width:150px;text-align:center;font-size:14px}
@@ -98,5 +112,5 @@ document.querySelectorAll(".preview-slider").forEach(r=>r.oninput=()=>{const par
 addEventListener("resize",resize);addEventListener("keydown",e=>{if(e.key==="ArrowRight")show(current+1);if(e.key==="ArrowLeft")show(current-1);});show(0);
 </script></body></html>`;
 await mkdir(join(root, "out"), { recursive: true });
-await writeFile(join(root, "out", "DyeCast-preview.html"), html);
+await writeFile(join(root, "out", release ? "DyeCast-release-preview.html" : "DyeCast-preview.html"), html);
 console.log("Saved a self-contained visual preview. No local server or network connection is required.");

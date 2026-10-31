@@ -17,8 +17,9 @@ body { margin: 0; }
 h1 { margin: 0; font: 500 81px/1.08 "Fraunces Variable", Georgia, serif; letter-spacing: -3.4px; }
 h1 em { display: block; margin-top: 9px; color: #8a4530; font-weight: 470; }
 .detail { font-size: 29px; color: #6c6359; line-height: 1.6; max-width: 540px; margin: 32px 0 0; }
-.tags { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
-.tags span { padding: 10px 14px; border-radius: 9px; color: #704635; border: 1px solid #e3d2c2; font-size: 18px; background: #f8efe7; }
+.tags { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; width: 700px; }
+.tags span { padding: 10px 14px; border-radius: 9px; color: #704635; border: 1px solid #e3d2c2; font-size: 20px; background: #f8efe7; }
+.tags span:first-child { background: #8a4530; border-color: #8a4530; color: #fff7ee; font-weight: 600; }
 .media { position: absolute; top: 185px; bottom: 170px; left: 805px; right: 86px; display: flex; align-items: center; justify-content: center; }
 .capture { width: 100%; overflow: hidden; border-radius: 22px; border: 1px solid #dbcab9; background: #fffdf9; box-shadow: 0 36px 80px -25px #61382045; }
 .browser-bar { height: 50px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #eaded1; background: #f5eee5; padding: 0 20px; color: #837263; font-size: 15px; }
@@ -70,9 +71,9 @@ h1 em { display: block; margin-top: 9px; color: #8a4530; font-weight: 470; }
 .portrait .beat-dots i.active { width: 32px; }
 .portrait .copy { left: 64px; right: 64px; top: 245px; width: auto; }
 .portrait .eyebrow { font-size: 23px; margin-bottom: 33px; }
-.portrait h1 { font-size: 99px; line-height: 1.06; max-width: 950px; letter-spacing: -3px; }
+.portrait h1 { font-size: 86px; line-height: 1.06; max-width: 950px; letter-spacing: -3px; }
 .portrait .detail { font-size: 32px; margin-top: 27px; line-height: 1.5; max-width: 860px; }
-.portrait .tags { margin-top: 20px; }
+.portrait .tags { margin-top: 20px; width: auto; }
 .portrait .tags span { font-size: 22px; padding: 12px 17px; }
 .portrait .media { top: 780px; left: 65px; right: 65px; bottom: 240px; }
 .portrait .capture-screen, .portrait .capture-screen > img { max-height: 850px; }

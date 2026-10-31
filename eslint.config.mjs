@@ -23,6 +23,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Third-party bundles copied here by scripts/sync-ai-assets.mjs (git-ignored, not our code).
+    "public/vendor/**",
   ]),
 ]);
 
