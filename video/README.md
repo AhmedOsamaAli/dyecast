@@ -40,7 +40,9 @@ npm run export -- --review                   # checks every scene for missing me
 npm run export                               # renders every frame and mixes voice + music into out/DyeCast-demo.mp4
 npm run export -- --short                    # the same for the 1080 x 1920 teaser
 npm run export -- --remix                    # re-mixes the audio onto the saved picture track (no frame render)
+npm run export -- --captions                 # rewrites only the subtitle file (.srt), sentence by sentence
 npm run export -- --picture-only             # silent picture track only, no narration needed
+npm run thumbnail                            # the YouTube thumbnail, out/DyeCast-thumbnail.jpg (2560 x 1440)
 ```
 
 Narration key: `npm run narrate` asks for a Gemini API key with hidden input. Alternatively put

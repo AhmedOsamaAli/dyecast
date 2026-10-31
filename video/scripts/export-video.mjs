@@ -15,6 +15,7 @@ const short = process.argv.includes("--short");
 const review = process.argv.includes("--review");
 const pictureOnly = process.argv.includes("--picture-only");
 const remix = process.argv.includes("--remix");
+const captionsOnly = process.argv.includes("--captions");
 const fps = 30;
 // Pacing: a scene is its narration plus a short lead-in and tail, so lines sit about 1.1 s apart and the music
 // fills the pauses. Scenes without narration (review, picture-only) fall back to the seconds in beats.json.
@@ -89,9 +90,10 @@ async function readSpeech(clip) {
   return { start, end, pauses: silences.filter((item) => item.start > start && item.end < end) };
 }
 
-// Seconds after a line starts at which each phrase is spoken. The clip's real pauses are matched to the commas
-// and full stops in the text, and the characters between two pauses are spread evenly over the time between them.
-function cueOffsets(text, phrases, speech) {
+// Maps a character position in a line's text to the seconds after the line starts at which it is spoken. The clip's
+// real pauses are matched to the commas and full stops in the text, and the characters between two pauses are
+// spread evenly over the time between them.
+function speechMap(text, speech) {
   const stops = [...text.matchAll(/[.,?!;:]\s+/g)].map((match) => match.index + match[0].length);
   const spoken = speech.end - speech.start - speech.pauses.reduce((sum, item) => sum + item.end - item.start, 0);
   const anchors = [];
@@ -120,12 +122,80 @@ function cueOffsets(text, phrases, speech) {
     time = anchor.to;
   }
   spans.push({ c0: char, c1: text.length, t0: time, t1: speech.end });
+  return (where) => {
+    const span = spans.find((item) => where >= item.c0 && where < item.c1) ?? spans.at(-1);
+    return span.t0 + ((where - span.c0) / (span.c1 - span.c0)) * (span.t1 - span.t0) - speech.start;
+  };
+}
+
+// Seconds after a line starts at which each phrase is spoken.
+function cueOffsets(text, phrases, speech) {
+  const timeOf = speechMap(text, speech);
   return phrases.map((phrase) => {
     const where = text.indexOf(phrase);
     if (where < 0) throw new Error(`The cue "${phrase}" is not in the narration.`);
-    const span = spans.find((item) => where >= item.c0 && where < item.c1);
-    return span.t0 + ((where - span.c0) / (span.c1 - span.c0)) * (span.t1 - span.t0) - speech.start;
+    return timeOf(where);
   });
+}
+
+// Subtitles: one cue per sentence (a long sentence is split near its middle), at most two lines of 42 characters.
+function captionCues(text, speech) {
+  const timeOf = speechMap(text, speech);
+  const pieces = [];
+  const split = (from, piece) => {
+    if (piece.length <= 80) {
+      pieces.push({ from, piece });
+      return;
+    }
+    let cut = -1;
+    let best = Infinity;
+    for (let i = 1; i < piece.length - 1; i++) {
+      if (piece[i] !== " ") continue;
+      const score = breakScore(piece, i);
+      if (score < best) {
+        best = score;
+        cut = i;
+      }
+    }
+    split(from, piece.slice(0, cut));
+    split(from + cut + 1, piece.slice(cut + 1));
+  };
+  for (const match of text.matchAll(/[^.!?]+[.!?]+/g)) {
+    const piece = match[0].trim();
+    split(match.index + match[0].indexOf(piece), piece);
+  }
+  return pieces.map((item, index) => {
+    const start = timeOf(item.from);
+    const next = index + 1 < pieces.length ? timeOf(pieces[index + 1].from) - 0.05 : speech.end - speech.start;
+    return { start, end: Math.max(next, start + 0.8), text: balanceLines(item.piece) };
+  });
+}
+
+// Lower is better: a break near the middle, after a comma or before a joining word, and never inside a capitalised name.
+function breakScore(piece, i) {
+  const before = piece.slice(0, i).split(" ").at(-1);
+  const after = piece.slice(i + 1).split(" ")[0];
+  let score = Math.abs(i - piece.length / 2);
+  if (before.endsWith(",")) score -= 12;
+  if (/^(and|or|to|but|with|so|that|because)$/i.test(after)) score -= 8;
+  if (/^[A-Z]/.test(before) && /^[A-Z]/.test(after)) score += 15;
+  return score;
+}
+
+// One line if it fits in 42 characters, otherwise two lines of similar length.
+function balanceLines(piece) {
+  if (piece.length <= 42) return piece;
+  let cut = -1;
+  let best = Infinity;
+  for (let i = 1; i < piece.length - 1; i++) {
+    if (piece[i] !== " " || i > 42 || piece.length - i - 1 > 42) continue;
+    const score = breakScore(piece, i);
+    if (score < best) {
+      best = score;
+      cut = i;
+    }
+  }
+  return cut < 0 ? piece : `${piece.slice(0, cut)}\n${piece.slice(cut + 1)}`;
 }
 
 const selected = short ? story.teaser.map((item) => ({
@@ -148,6 +218,21 @@ for (const [index, beat] of selected.entries()) {
   at += seconds;
 }
 if (!short && (at < 60 || at > 180)) throw new Error(`The competition video must be 1–3 minutes; this timeline is ${at.toFixed(1)}s.`);
+
+function captionsFor(list) {
+  let number = 0;
+  return list.flatMap((beat) => captionCues(beat.narration, beat.speech).map((cue) => {
+    const from = beat.from + beat.lead;
+    return `${++number}\n${timestamp(from + cue.start)} --> ${timestamp(from + cue.end)}\n${cue.text}\n`;
+  })).join("\n");
+}
+
+// Writes only the subtitle file, so the finished MP4 is left untouched (for example while it is being uploaded).
+if (captionsOnly) {
+  await writeFile(join(output, `${name}.srt`), captionsFor(beats));
+  console.log(`Subtitles written: ${join(output, `${name}.srt`)}`);
+  process.exit(0);
+}
 const previewFile = join(output, "DyeCast-release-preview.html");
 
 // A file URL and embedded media only. This exporter never opens a localhost HTTP/WebSocket service.
@@ -346,8 +431,7 @@ try {
     if (video?.width !== width || video?.height !== height || video.codec_name !== "h264" || audio?.codec_name !== "aac" ||
       Math.abs(Number(metadata.format.duration) - at) > 0.15) throw new Error("The exported MP4 does not match the required format and timeline.");
 
-    const srt = beats.map((beat, index) => `${index + 1}\n${timestamp(beat.from + beat.lead)} --> ${timestamp(beat.from + beat.lead + beat.speech.end - beat.speech.start)}\n${beat.narration}\n`).join("\n");
-    await writeFile(join(output, `${name}.srt`), srt);
+    await writeFile(join(output, `${name}.srt`), captionsFor(beats));
     // YouTube only accepts chapters that are at least 10 s long, so a short scene joins the chapter before it.
     const chapters = [];
     for (const beat of beats) {
