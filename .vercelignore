@@ -8,5 +8,6 @@
 /node_modules/
 /coverage/
 /public/vendor/
+/video/
 *.tsbuildinfo
 next-env.d.ts

@@ -45,5 +45,8 @@ data/*.db*
 # downloaded build inputs (e.g. the source photo for public/hair, see scripts/hair-photo.mjs)
 /.cache/
 /public/vendor/
+/video/node_modules/
+/video/public/
+/video/out/
 # env (keep the example)
 !.env.example

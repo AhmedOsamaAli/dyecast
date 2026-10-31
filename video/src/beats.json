@@ -1,0 +1,73 @@
+{
+  "beats": [
+    {
+      "id": "hook", "seconds": 9, "eyebrow": "BEFORE YOU DYE",
+      "headline": "The box has a promise.", "accent": "Your hair has a history.",
+      "detail": "See the difference before the color is on your head.",
+      "caption": "The promise is not the forecast.",
+      "narration": "The box has a promise. Your hair has a history. DyeCast shows the difference before you dye."
+    },
+    {
+      "id": "profile", "seconds": 12, "eyebrow": "01 / YOUR STARTING POINT",
+      "headline": "Your hair.", "accent": "Not someone else's.",
+      "detail": "Depth. Tone. History. You confirm the starting point.",
+      "caption": "A photo suggests. You decide.",
+      "narration": "Start with your own hair. Tell us its depth, tone and color history. Or let a photo suggest a starting point. You stay in control."
+    },
+    {
+      "id": "choose", "seconds": 14, "eyebrow": "02 / HELP ME CHOOSE",
+      "headline": "A change that", "accent": "fits your life.",
+      "detail": "How bold? How much upkeep? Find your best fits.",
+      "caption": "Not sure yet? Start with you.",
+      "narration": "Haven't decided? Choose how big a change you want and how much upkeep you're happy with. DyeCast ranks the colors that fit your starting point."
+    },
+    {
+      "id": "try", "seconds": 12, "eyebrow": "03 / EXPLORE THE POSSIBILITIES",
+      "headline": "Three possibilities.", "accent": "One real you.",
+      "detail": "Compare the best-fit colors on your own photo.",
+      "caption": "Try possibilities before committing.",
+      "narration": "Compare those looks on your own photo. The quick preview runs on your device. It's a visual guide, not a promise of a salon result."
+    },
+    {
+      "id": "reality", "seconds": 15, "eyebrow": "04 / THE REALITY CHECK",
+      "headline": "The promise.", "accent": "The likely result.",
+      "detail": "Put the box beside a forecast for your starting hair.",
+      "caption": "Compare the box with your forecast.",
+      "narration": "Now check a box. The forecast puts its promise next to your likely result. Dark hair cannot simply become platinum from one box."
+    },
+    {
+      "id": "why", "seconds": 12, "eyebrow": "05 / UNDERSTAND THE DIFFERENCE",
+      "headline": "No mystery.", "accent": "Just the why.",
+      "detail": "Lift limits. Underlying warmth. Roots and lengths.",
+      "caption": "Understand what your hair can do.",
+      "narration": "DyeCast explains why in plain words: how far it can lift, what warmth comes through, and when roots and lengths behave differently."
+    },
+    {
+      "id": "buy", "seconds": 12, "eyebrow": "06 / A ROUTE YOU CAN FOLLOW",
+      "headline": "A better route.", "accent": "A box to look for.",
+      "detail": "Real shades. Source links. A safety-first plan.",
+      "caption": "Know the route before you buy.",
+      "narration": "Ready to choose? Find real shades to look for, along with better routes, how many boxes you need, and a safety-first plan."
+    },
+    {
+      "id": "privacy", "seconds": 10, "eyebrow": "PRIVATE BY DESIGN",
+      "headline": "Explore privately.", "accent": "Choose what leaves.",
+      "detail": "Photos are optional. Processing is your choice.",
+      "caption": "Optional photos. Explicit consent.",
+      "narration": "Photos are optional. You choose when YouCam receives a cleaned copy. Stored selfies are off by default, and local previews clear when you sign out."
+    },
+    {
+      "id": "close", "seconds": 9, "eyebrow": "EXPLORE BEFORE YOU COMMIT",
+      "headline": "Your color.", "accent": "With context.",
+      "detail": "A forecast. Not a guarantee.",
+      "caption": "Know your starting point.",
+      "narration": "Explore before you commit. DyeCast. A forecast, not a guarantee. Always follow the box instructions and do an allergy alert and strand test."
+    }
+  ],
+  "teaser": [
+    { "id": "hook", "seconds": 7 },
+    { "id": "choose", "seconds": 10 },
+    { "id": "reality", "seconds": 12 },
+    { "id": "close", "seconds": 7 }
+  ]
+}

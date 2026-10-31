@@ -327,6 +327,13 @@ deletion.
 - It is not medical advice. The product's instructions, the allergy alert test and a strand test always come first;
   henna history, big lifts and damaged hair are routed to a professional.
 
+## Local video draft
+
+[video/](video/) contains the isolated Remotion film project and its [usage guide](video/README.md).
+The offline visual preview uses real DyeCast screens and a public-domain demo portrait.
+MP4 rendering requires permitted localhost connections; the current deliverable is a visual storyboard,
+with music, captions and proposed narration, not a finished narrated video.
+
 ## License
 
 [MIT](LICENSE)
