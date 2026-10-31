@@ -50,6 +50,23 @@ async function photoStrip(device = false) {
     `<figure>${await image(name)}<figcaption>${label}</figcaption></figure>`))).join("")}</div>`;
 }
 
+// The four YouCam feature APIs DyeCast calls (the slugs are the real task endpoints used by src/lib/youcam).
+function youcamMap() {
+  const apis = [
+    ["01", "AI Facial Color Tones Analyzer", "Double-checks your starting color and reads your undertone", "skin-tone-analysis"],
+    ["02", "AI Hair Length Detection", "Suggests your length, which sets how many boxes you need", "hair-length-detection"],
+    ["03", "AI Hair Density Detection", "Reads density from a hairline photo for the box count", "hair-density-detection"],
+    ["04", "AI Hair Color Virtual Try-On", "Renders the box promise and your likely result on your photo", "hair-color"],
+  ];
+  return `<div class="api-map"><div class="api-flow">
+    <span>Your photo<small>cleaned on your device</small></span><i>&rarr;</i>
+    <span class="api-hub">YouCam API<small>four feature APIs</small></span><i>&rarr;</i>
+    <span class="api-engine">DyeCast forecast<small>color chemistry</small></span><i>&rarr;</i>
+    <span>Your reality check<small>box vs. your hair</small></span>
+  </div><div class="api-cards">${apis.map(([number, title, text, slug]) =>
+    `<div><b>${number}</b><p><strong>${title}</strong><span>${text}</span></p><code>${slug}</code></div>`).join("")}</div></div>`;
+}
+
 async function compare() {
   return `<div class="hair-compare">${await image("swatch-likely.png", "macro-hair")}${await image("swatch-box.png", "macro-hair before-hair", "clip-path:inset(0 50% 0 0)")}<div class="hair-shade"></div><span class="compare-label left">Box promise</span><span class="compare-label right">Likely on your hair</span><div class="compare-divider" style="left:50%"><span>&lt; &gt;</span></div><div class="compare-bottom">Actual app forecast / shade 9.1</div><input class="preview-slider" type="range" min="5" max="95" value="50" aria-label="Compare box and likely result"></div>`;
 }
@@ -63,17 +80,19 @@ for (const [index, beat] of story.beats.entries()) {
     case "choose": media = await capture("choose-cards.png", "choose-best.png", "choose-alternate.png"); break;
     case "try": media = release ? await photoStrip(true) : await capture("try-colors.png", "try-colors-phone.png"); break;
     case "reality": media = `<div class="reality-compare">${await compare()}</div><div class="reality-photos">${await photoStrip()}</div>`; break;
+    case "youcam": media = youcamMap(); break;
     case "why": media = await capture("why.png"); break;
     case "buy": media = await capture("products.png", undefined, "plan.png"); break;
     case "privacy": media = `<div class="privacy-cards">${["Quick previews on your device", "Consent before YouCam processing", "Stored selfies off by default", "Local photos cleared at sign-out"].map((label, n) => `<div><span>0${n + 1}</span><strong>${label}</strong><b>&#10003;</b></div>`).join("")}<p>Deletion is requested after delivery and retried if unconfirmed.</p></div>`; break;
     case "close": media = `<div class="closing-hair">${await image("swatch-likely.png")}<div></div></div>`; break;
     default: throw new Error(`Unsupported preview scene: ${beat.id}`);
   }
-  const source = ["profile", "try", "reality"].includes(beat.id) ? "NASA public-domain demo portrait | Illustrative try-on, no endorsement" : "Rule-based educational forecast | Results vary";
+  const source = ["profile", "try", "reality"].includes(beat.id) ? "NASA public-domain demo portrait | Illustrative try-on, no endorsement"
+    : beat.id === "youcam" ? "YouCam API integration in the live DyeCast app" : "Rule-based educational forecast | Results vary";
   sections.push(`<section class="scene landscape scene-${beat.id}${beat.id === "close" ? " dark" : ""}" data-seconds="${beat.seconds}" ${index ? "hidden" : ""}>
     <div class="background-orbit orbit-one"></div><div class="background-orbit orbit-two"></div>
-    <header class="film-header"><span class="wordmark">dye<i>cast</i><b>.</b></span><span>YOUR COLOR, WITH CONTEXT</span><div class="beat-dots">${story.beats.map((_, n) => `<i class="${n === index ? "active" : ""}"></i>`).join("")}</div></header>
-    <div class="copy"><p class="eyebrow">${escape(beat.eyebrow)}</p><h1>${escape(beat.headline)}<em>${escape(beat.accent)}</em></h1><p class="detail">${escape(beat.detail)}</p>${beat.api ? `<div class="tags">${beat.api.map((tag) => `<span>${escape(tag)}</span>`).join("")}</div>` : ""}${beat.id === "close" ? '<div class="visit">dyecast.vercel.app &#8599;</div><p class="safety">Follow the box instructions.<br>Allergy alert test. Strand test.</p>' : ""}</div>
+    <header class="film-header"><span class="wordmark">dye<i>cast</i><b>.</b></span><span>YOUR COLOR, WITH CONTEXT</span><div class="powered">POWERED BY <strong>YOUCAM API</strong></div><div class="beat-dots">${story.beats.map((_, n) => `<i class="${n === index ? "active" : ""}"></i>`).join("")}</div></header>
+    <div class="copy"><p class="eyebrow">${escape(beat.eyebrow)}</p><h1>${escape(beat.headline)}<em>${escape(beat.accent)}</em></h1><p class="detail">${escape(beat.detail)}</p>${beat.api ? `<div class="tags">${beat.api.map((tag) => `<span>${escape(tag)}</span>`).join("")}</div>` : ""}${beat.id === "close" ? '<div class="visit">dyecast.vercel.app &#8599;</div><p class="built">Built with the <strong>YouCam API</strong><span>Facial Color Tones &middot; Hair Length &middot; Hair Density &middot; Hair Color Try-On</span></p><p class="safety">Follow the box instructions.<br>Allergy alert test. Strand test.</p>' : ""}</div>
     <div class="media">${media}</div><footer class="film-footer"><span class="caption">${escape(beat.caption)}</span><span class="source">${source}</span></footer>
   </section>`);
 }

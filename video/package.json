@@ -6,7 +6,7 @@
   "scripts": {
     "capture": "node scripts/capture.mjs",
     "capture-plan": "node scripts/capture-plan.mjs",
-    "audio": "node scripts/audio.mjs",
+    "audio": "node scripts/score.mjs",
     "preview": "node scripts/preview.mjs",
     "narrate": "pwsh -NoLogo -NoProfile -File scripts/narrate.ps1",
     "prepare-release": "node scripts/prepare-release.mjs",

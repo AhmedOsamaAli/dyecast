@@ -20,6 +20,8 @@
       "headline": "A change that", "accent": "fits your life.",
       "detail": "How bold? How much upkeep? Find your best fits.",
       "caption": "Not sure yet? Start with you.",
+      "api": ["YouCam API", "Facial Color Tones: undertone"],
+      "cues": ["how much upkeep"],
       "narration": "Haven't decided? Choose how big a change you want and how much upkeep you're happy with. DyeCast ranks the colors that fit your starting point."
     },
     {
@@ -35,20 +37,31 @@
       "detail": "Put the box beside a forecast for your starting hair.",
       "caption": "Compare the box with your forecast.",
       "api": ["YouCam API", "Hair Color Virtual Try-On"],
+      "cues": ["YouCam Hair Color"],
       "narration": "Now check a box. The forecast puts its promise next to your likely result. YouCam Hair Color renders both on your photo. Dark hair cannot simply become platinum from one box."
     },
     {
-      "id": "why", "seconds": 12, "eyebrow": "05 / UNDERSTAND THE DIFFERENCE",
+      "id": "youcam", "seconds": 17, "eyebrow": "05 / POWERED BY YOUCAM",
+      "headline": "Built on", "accent": "YouCam.",
+      "detail": "Four YouCam APIs see your hair. DyeCast adds the color science.",
+      "caption": "YouCam sees. DyeCast forecasts.",
+      "narration": "DyeCast is built on four YouCam APIs. Facial Color Tones double-checks your starting color and reads your undertone. Hair Length and Hair Density set how many boxes you need. Hair Color Try-On renders the result on your photo. YouCam sees your hair. DyeCast forecasts what the box will do.",
+      "cues": ["Facial Color Tones", "Hair Length", "Hair Density", "Hair Color Try-On", "YouCam sees your hair", "DyeCast forecasts"]
+    },
+    {
+      "id": "why", "seconds": 12, "eyebrow": "06 / UNDERSTAND THE DIFFERENCE",
       "headline": "No mystery.", "accent": "Just the why.",
       "detail": "Lift limits. Underlying warmth. Roots and lengths.",
       "caption": "Understand what your hair can do.",
       "narration": "DyeCast explains why in plain words: how far it can lift, what warmth comes through, and when roots and lengths behave differently."
     },
     {
-      "id": "buy", "seconds": 12, "eyebrow": "06 / A ROUTE YOU CAN FOLLOW",
+      "id": "buy", "seconds": 12, "eyebrow": "07 / A ROUTE YOU CAN FOLLOW",
       "headline": "A better route.", "accent": "A box to look for.",
       "detail": "Real shades. Source links. A safety-first plan.",
       "caption": "Know the route before you buy.",
+      "api": ["YouCam API", "Hair Length + Density: box count"],
+      "cues": ["safety-first plan"],
       "narration": "Ready to choose? Find real shades to look for, along with better routes, how many boxes you need, and a safety-first plan."
     },
     {
@@ -56,6 +69,7 @@
       "headline": "Explore privately.", "accent": "Choose what leaves.",
       "detail": "Photos are optional. Processing is your choice.",
       "caption": "Optional photos. Explicit consent.",
+      "api": ["YouCam API", "Tasks deleted after delivery"],
       "narration": "Photos are optional. You choose when YouCam receives a cleaned copy. Stored selfies are off by default, and local previews clear when you sign out."
     },
     {
@@ -63,13 +77,13 @@
       "headline": "Your color.", "accent": "With context.",
       "detail": "A forecast. Not a guarantee.",
       "caption": "Know your starting point.",
-      "narration": "Explore before you commit. DyeCast. A forecast, not a guarantee. Always follow the box instructions and do an allergy alert and strand test."
+      "narration": "Explore before you commit. DyeCast, built with the YouCam API. A forecast, not a guarantee. Always follow the box instructions and do an allergy alert and strand test."
     }
   ],
   "teaser": [
     { "id": "hook", "seconds": 7 },
-    { "id": "choose", "seconds": 10 },
     { "id": "reality", "seconds": 12 },
+    { "id": "youcam", "seconds": 14 },
     { "id": "close", "seconds": 7 }
   ]
 }
